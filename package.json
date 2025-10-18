@@ -15,7 +15,7 @@
     "url": "git+https://github.com/TheeKia/dotimation.git"
   },
   "scripts": {
-    "build": "bunup --minify --footer '// built with love'",
+    "build": "bunup --env.NODE_ENV='production' --minify --footer '// built with love'",
     "dev": "bun run --cwd test/ui dev",
     "postinstall": "bun simple-git-hooks",
     "lint": "biome check .",
