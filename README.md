@@ -16,13 +16,13 @@ Dotimation makes use of react-query so make sure this is used inside a QueryClie
 import { Dotimation } from 'dotimation';
 
 function Component() {
-	return (
-		<Dotimation
-			item={{ type: 'text', data: 'Hello' }}
-			width={256}
-			height={256}
-		/>
-	);
+  return (
+    <Dotimation
+      item={{ type: 'text', data: 'Hello' }}
+      width={256}
+      height={256}
+    />
+  );
 }
 ```
 
