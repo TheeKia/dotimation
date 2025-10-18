@@ -1,7 +1,7 @@
 'use client'
 
 import { useQuery } from '@tanstack/react-query'
-import { useEffect, useRef } from 'react'
+import { useEffect, useImperativeHandle, useRef } from 'react'
 
 import { animateParticles } from '../animations/fps'
 import type { AnimateItem, Particle } from '../types'
@@ -13,18 +13,22 @@ export default function Dotimation({
   height,
   className,
   fontFamily,
+  canvasRef,
 }: {
   item: AnimateItem
   width: number
   height: number
   className?: string
   fontFamily?: string
+  canvasRef?: React.RefObject<HTMLCanvasElement>
 }): React.ReactNode {
   const ref = useRef<HTMLCanvasElement>(null)
   const animationController = useRef<AbortController | null>(null)
   const particles = useRef<Particle[]>([])
   const intermediateParticles = useRef<Particle[]>([])
   const prevData = useRef<Particle[]>([])
+
+  useImperativeHandle(canvasRef, () => ref.current!)
 
   const { data: _data } = useQuery({
     queryKey: ['particles', width, height, item, fontFamily],
@@ -130,6 +134,6 @@ export default function Dotimation({
   }, [_data, width, height])
 
   return (
-    <canvas className={className} ref={ref} width={width} height={height} />
+    <canvas ref={ref} className={className} width={width} height={height} />
   )
 }
