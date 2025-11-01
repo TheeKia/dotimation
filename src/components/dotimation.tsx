@@ -1,52 +1,36 @@
 'use client'
 
-import { useQuery } from '@tanstack/react-query'
 import { useEffect, useImperativeHandle, useRef } from 'react'
-
+import useInitialParticles from '@/hooks/use-initial-particles'
 import { animateParticles } from '../animations/fps'
 import type { AnimateItem, Particle } from '../types'
-import { getCtx, initParticles } from '../utils'
+import { getCtx } from '../utils/utils'
 
 export default function Dotimation({
   item,
   width,
   height,
   className,
-  fontFamily,
   canvasRef,
+  style,
 }: {
   item: AnimateItem
   width: number
   height: number
   className?: string
-  fontFamily?: string
   canvasRef?: React.RefObject<HTMLCanvasElement>
+  style?: Omit<React.CSSProperties, 'width' | 'height'>
 }): React.ReactNode {
   const ref = useRef<HTMLCanvasElement>(null)
   const animationController = useRef<AbortController | null>(null)
   const particles = useRef<Particle[]>([])
   const intermediateParticles = useRef<Particle[]>([])
-  const prevData = useRef<Particle[]>([])
 
   useImperativeHandle(canvasRef, () => ref.current!)
 
-  const { data: _data } = useQuery({
-    queryKey: ['particles', width, height, item, fontFamily],
-    queryFn: () => initParticles(width, height, item, fontFamily),
-    enabled: !!item.data,
-    refetchOnWindowFocus: false,
-    refetchOnReconnect: false,
-    staleTime: 0,
-    gcTime: 0,
-    retry: false,
-  })
+  const data = useInitialParticles(item, width, height)
 
   useEffect(() => {
-    if (_data) prevData.current = _data
-  }, [_data])
-
-  useEffect(() => {
-    const data = _data ?? prevData.current
     if (!ref.current || !data || data.length === 0) return
 
     const canvas = ref.current
@@ -131,9 +115,15 @@ export default function Dotimation({
       animationController.current?.abort()
       animationController.current = null
     }
-  }, [_data, width, height])
+  }, [data, width, height])
 
   return (
-    <canvas ref={ref} className={className} width={width} height={height} />
+    <canvas
+      ref={ref}
+      className={className}
+      width={width}
+      height={height}
+      style={style}
+    />
   )
 }

@@ -1,20 +1,70 @@
 import './styles.css'
 
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { useState } from 'react'
 import { Dotimation } from '../../src'
+import type { AnimateItem } from '../../src/types'
 
-const queryClient = new QueryClient()
+const TEST_ITEMS: { label: string; item: AnimateItem }[] = [
+  {
+    label: 'Auto Size',
+    item: {
+      type: 'text',
+      data: 'Hello\nThis is a second line',
+      fontSize: 'AUTO',
+      fontFamily: 'sans-serif',
+    },
+  },
+  {
+    label: 'Auto Size (Short)',
+    item: {
+      type: 'text',
+      data: 'Hello',
+      fontSize: 'AUTO',
+      fontFamily: 'sans-serif',
+    },
+  },
+  {
+    label: 'Auto Mono Size',
+    item: {
+      type: 'text',
+      data: 'Hello\nThis is a second line',
+      fontSize: 'AUTO_MONO',
+      fontFamily: 'monospace',
+    },
+  },
+  {
+    label: 'Auto Mono Size (Short)',
+    item: {
+      type: 'text',
+      data: 'Hello',
+      fontSize: 'AUTO_MONO',
+      fontFamily: 'monospace',
+    },
+  },
+  {
+    label: 'Fixed Size',
+    item: {
+      type: 'text',
+      data: 'Hi',
+      fontSize: 30,
+    },
+  },
+]
 
 export function App() {
+  const [item, setItem] = useState<AnimateItem>(TEST_ITEMS[0]!.item)
+
   return (
     <main>
-      <QueryClientProvider client={queryClient}>
-        <Dotimation
-          item={{ type: 'text', data: 'Hello' }}
-          width={256}
-          height={256}
-        />
-      </QueryClientProvider>
+      <Dotimation item={item} width={512} height={512} />
+
+      <div className="list">
+        {TEST_ITEMS.map(({ label, item }) => (
+          <button key={label} type="button" onClick={() => setItem(item)}>
+            {label}
+          </button>
+        ))}
+      </div>
     </main>
   )
 }

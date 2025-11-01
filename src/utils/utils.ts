@@ -1,62 +1,5 @@
-import type { AnimateItem, Particle } from './types'
-
-// Scales by text content so wider glyphs (W,M,0-9, emoji, CJK) cost more.
-export function getFontSize(width: number, text: string): number {
-  const MAX = 300
-  const MIN = 10
-  if (!text) return MIN
-
-  // Average per-glyph "em" costs (relative to 1em width).
-  const AVG = 0.58 // generic fallback
-  const LIGHT = 0.46 // a–z
-  const HEAVY = 0.72 // W/M
-  const UPPER_NUM = 0.64 // A–Z and 0–9
-  const SPACE = 0.28 // space
-  const PUNCT = 0.38 // .,:;!?-_"'`/\
-  const CJK = 1.0 // CJK full-width-ish
-  const EMOJI = 1.1
-
-  // Estimate total "em width" for the string
-  let emTotal = 0
-  for (const ch of text) {
-    const cp = ch.codePointAt(0)!
-
-    if (cp <= 0x7f) {
-      // Basic Latin
-      if (ch === ' ') emTotal += SPACE
-      else if (/[.,;:!?'"`\-_/\\]/.test(ch)) emTotal += PUNCT
-      else if (/[MW]/.test(ch)) emTotal += HEAVY
-      else if (/[A-Z0-9]/.test(ch)) emTotal += UPPER_NUM
-      else if (/[a-z]/.test(ch)) emTotal += LIGHT
-      else emTotal += AVG
-    } else {
-      // Emoji + CJK buckets. (Good enough without a full width table.)
-      if (cp >= 0x1f300 && cp <= 0x1faff) emTotal += EMOJI
-      else if (
-        (cp >= 0x4e00 && cp <= 0x9fff) || // CJK Unified
-        (cp >= 0x3040 && cp <= 0x30ff) || // JP Kana
-        (cp >= 0xac00 && cp <= 0xd7af) // Hangul
-      ) {
-        emTotal += CJK
-      } else {
-        emTotal += AVG
-      }
-    }
-  }
-
-  // If fontSize * emTotal ≈ pixel width, then fontSize ≈ width / emTotal.
-  // That gives a tight fit. We blend with a gentler width curve for very short labels
-  // so "OK" or "Hi" don’t explode visually.
-  const n = [...text].length
-  const sizeByLength = width / (Math.max(emTotal, 1) + 1)
-  const sizeByWidthCurve = Math.sqrt(width) * 2 + Math.log1p(width) // soft growth
-  const blend = Math.min(n / 5, 1) // rely on length after ~4 chars
-
-  let px = sizeByLength * blend + sizeByWidthCurve * (1 - blend)
-
-  if (!Number.isFinite(px)) px = MIN
-  return Math.max(MIN, Math.min(px, MAX)) * 1.5
-}
+import type { AnimateItem, Particle } from '../types'
+import { getAutoFontSize, getMonospaceFontSize } from './font'
 
 function getScale(
   width: number,
@@ -83,7 +26,6 @@ export async function initParticles(
   width: number,
   height: number,
   item: AnimateItem,
-  fontFamily: string = 'sans-serif',
 ): Promise<Particle[]> {
   const canvas = document.createElement('canvas')
   const ctx = getCtx(canvas, width, height)
@@ -102,12 +44,33 @@ export async function initParticles(
     const y = (height - sh) / 2
     ctx.drawImage(image, x, y, sw, sh)
   } else {
-    const fontSize = getFontSize(width, item.data)
+    let fontSize: number
+    if (item.fontSize === 'AUTO_MONO') {
+      fontSize = getMonospaceFontSize(width, item.data)
+    } else if (item.fontSize === 'AUTO' || item.fontSize === undefined) {
+      fontSize = getAutoFontSize(width, item.data)
+    } else {
+      fontSize = item.fontSize
+    }
+    const fontFamily = item.fontFamily || 'sans-serif'
     ctx.font = `${fontSize}px ${fontFamily}`
     ctx.fillStyle = 'rgb(200,200,200)'
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
-    ctx.fillText(item.data, width / 2, height / 2)
+
+    const lines = item.data.split('\n')
+    const lineHeight = fontSize * 1.2 // Standard line height multiplier
+    const totalTextHeight = lines.length * lineHeight
+
+    // Calculate starting Y position to center the entire text block
+    const startY = (height - totalTextHeight) / 2 + lineHeight / 2
+
+    // Render each line
+    lines.forEach((line, index) => {
+      const y = startY + index * lineHeight
+      ctx.fillText(line, width / 2, y)
+    })
+    // ctx.fillText(item.data, width / 2, height / 2)
   }
 
   const devW = canvas.width // width * dpr

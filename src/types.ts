@@ -1,5 +1,10 @@
 export type AnimateItem =
-  | { type: 'text'; data: string }
+  | {
+      type: 'text'
+      data: string
+      fontFamily?: string
+      fontSize?: number | 'AUTO' | 'AUTO_MONO'
+    }
   | { type: 'image'; data: string; maxWidth?: number; maxHeight?: number }
 
 export type Particle = {
