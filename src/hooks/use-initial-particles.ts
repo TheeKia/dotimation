@@ -7,6 +7,7 @@ export default function useInitialParticles(
   item: AnimateItem,
   width: number,
   height: number,
+  defaultFontFamily: string,
 ): Particle[] {
   const prevData = useRef<Particle[]>([])
   const [data, setData] = useState<Particle[] | null>(null)
@@ -20,12 +21,12 @@ export default function useInitialParticles(
     prevItem.current = item
 
     const currentExecution = ++executionId.current
-    initParticles(width, height, item).then((data) => {
+    initParticles(width, height, item, defaultFontFamily).then((data) => {
       if (currentExecution === executionId.current) {
         setData(data)
       }
     })
-  }, [width, height, item])
+  }, [width, height, item, defaultFontFamily])
 
   useEffect(() => {
     if (data) prevData.current = data

@@ -26,6 +26,7 @@ export async function initParticles(
   width: number,
   height: number,
   item: AnimateItem,
+  defaultFontFamily: string,
 ): Promise<Particle[]> {
   const canvas = document.createElement('canvas')
   const ctx = getCtx(canvas, width, height)
@@ -52,7 +53,7 @@ export async function initParticles(
     } else {
       fontSize = item.fontSize
     }
-    const fontFamily = item.fontFamily || 'sans-serif'
+    const fontFamily = item.fontFamily || defaultFontFamily
     ctx.font = `${fontSize}px ${fontFamily}`
     ctx.fillStyle = 'rgb(200,200,200)'
     ctx.textAlign = 'center'

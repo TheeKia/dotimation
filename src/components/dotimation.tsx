@@ -13,13 +13,15 @@ export default function Dotimation({
   className,
   canvasRef,
   style,
+  defaultFontFamily = 'sans-serif',
 }: {
   item: AnimateItem
   width: number
   height: number
-  className?: string
   canvasRef?: React.RefObject<HTMLCanvasElement>
+  className?: string
   style?: Omit<React.CSSProperties, 'width' | 'height'>
+  defaultFontFamily?: string
 }): React.ReactNode {
   const ref = useRef<HTMLCanvasElement>(null)
   const animationController = useRef<AbortController | null>(null)
@@ -28,7 +30,7 @@ export default function Dotimation({
 
   useImperativeHandle(canvasRef, () => ref.current!)
 
-  const data = useInitialParticles(item, width, height)
+  const data = useInitialParticles(item, width, height, defaultFontFamily)
 
   useEffect(() => {
     if (!ref.current || !data || data.length === 0) return
