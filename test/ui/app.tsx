@@ -49,6 +49,13 @@ const TEST_ITEMS: { label: string; item: AnimateItem }[] = [
       fontSize: 30,
     },
   },
+  {
+    label: 'Image',
+    item: {
+      type: 'image',
+      data: 'https://th-wave.s3.us-east-1.amazonaws.com/users/CGRZsPszAMiO6teMTTuvl6fUKNnYODwD/logo/1762107543514.png',
+    },
+  },
 ]
 
 export function App() {

@@ -37,6 +37,7 @@ export async function initParticles(
   if (item.type === 'image') {
     const image = new Image()
     image.src = item.data
+    image.crossOrigin = 'anonymous'
     await image.decode()
     const scale = getScale(width, height, image, item)
     const sw = image.width * scale
