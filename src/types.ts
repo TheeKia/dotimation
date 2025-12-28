@@ -4,8 +4,15 @@ export type AnimateItem =
       data: string
       fontFamily?: string
       fontSize?: number | 'AUTO' | 'AUTO_MONO'
+      textColor?: string | CanvasGradient | CanvasPattern
     }
-  | { type: 'image'; data: string; maxWidth?: number; maxHeight?: number }
+  | {
+      type: 'image'
+      data: string
+      maxWidth?: number
+      maxHeight?: number
+      invert?: boolean
+    }
 
 export type Particle = {
   homeX: number

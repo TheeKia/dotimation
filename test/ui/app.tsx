@@ -12,6 +12,7 @@ const TEST_ITEMS: { label: string; item: AnimateItem }[] = [
       data: 'Hello\nThis is a second line',
       fontSize: 'AUTO',
       fontFamily: 'sans-serif',
+      textColor: 'rgb(255,0,255)',
     },
   },
   {
@@ -53,7 +54,15 @@ const TEST_ITEMS: { label: string; item: AnimateItem }[] = [
     label: 'Image',
     item: {
       type: 'image',
-      data: 'https://th-wave.s3.us-east-1.amazonaws.com/users/CGRZsPszAMiO6teMTTuvl6fUKNnYODwD/logo/1762107543514.png',
+      data: 'https://th-wave.s3.us-east-1.amazonaws.com/users/pZjbwZMppBUaxIrni4jHBwoykc0CnpFR/logo/1766271912386.webp',
+    },
+  },
+  {
+    label: 'Image (Inverted)',
+    item: {
+      type: 'image',
+      data: 'https://th-wave.s3.us-east-1.amazonaws.com/users/pZjbwZMppBUaxIrni4jHBwoykc0CnpFR/logo/1766271912386.webp',
+      invert: true,
     },
   },
 ]

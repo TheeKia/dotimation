@@ -22,11 +22,15 @@ function getScale(
   return Math.min(userScale, scaleLimit)
 }
 
+const DEFAULT_TEXT_COLOR = 'rgb(200,200,200)'
+
 export async function initParticles(
   width: number,
   height: number,
   item: AnimateItem,
   defaultFontFamily: string,
+  alpha: number,
+  pointSpacingCss: number,
 ): Promise<Particle[]> {
   const canvas = document.createElement('canvas')
   const ctx = getCtx(canvas, width, height)
@@ -44,7 +48,14 @@ export async function initParticles(
     const sh = image.height * scale
     const x = (width - sw) / 2
     const y = (height - sh) / 2
-    ctx.drawImage(image, x, y, sw, sh)
+    if (item.invert) {
+      ctx.save()
+      ctx.filter = 'invert(1)'
+      ctx.drawImage(image, x, y, sw, sh)
+      ctx.restore()
+    } else {
+      ctx.drawImage(image, x, y, sw, sh)
+    }
   } else {
     let fontSize: number
     if (item.fontSize === 'AUTO_MONO') {
@@ -56,7 +67,7 @@ export async function initParticles(
     }
     const fontFamily = item.fontFamily || defaultFontFamily
     ctx.font = `${fontSize}px ${fontFamily}`
-    ctx.fillStyle = 'rgb(200,200,200)'
+    ctx.fillStyle = item.textColor || DEFAULT_TEXT_COLOR
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
 
@@ -81,14 +92,12 @@ export async function initParticles(
   const pixels = img.data
 
   const particles: Particle[] = []
-  const densityCss = 2
-  const stepDev = Math.max(1, Math.round(densityCss * dpr))
-  const ALPHA = 128
+  const stepDev = Math.max(1, Math.round(pointSpacingCss * dpr))
 
   for (let yDev = 0; yDev < devH; yDev += stepDev) {
     for (let xDev = 0; xDev < devW; xDev += stepDev) {
       const idx = (yDev * devW + xDev) * 4
-      if (pixels[idx + 3]! > ALPHA) {
+      if (pixels[idx + 3]! > alpha) {
         const xCss = xDev / dpr
         const yCss = yDev / dpr
         const r = pixels[idx]!,
