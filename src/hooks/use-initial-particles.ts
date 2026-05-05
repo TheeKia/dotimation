@@ -11,16 +11,22 @@ export default function useInitialParticles(
   alpha: number,
   pointSpacingCss: number,
 ): Particle[] {
-  const prevData = useRef<Particle[]>([])
-  const [data, setData] = useState<Particle[] | null>(null)
+  const [data, setData] = useState<Particle[]>([])
   const prevItem = useRef<AnimateItem | null>(null)
+  const prevSize = useRef({ width: 0, height: 0 })
   const executionId = useRef(0)
 
   useEffect(() => {
     if (!item.data) return
 
-    if (prevItem.current && shallowEqual(prevItem.current, item)) return
+    const itemChanged =
+      !prevItem.current || !shallowEqual(prevItem.current, item)
+    const sizeChanged =
+      prevSize.current.width !== width || prevSize.current.height !== height
+    if (!itemChanged && !sizeChanged) return
+
     prevItem.current = item
+    prevSize.current = { width, height }
 
     const currentExecution = ++executionId.current
     initParticles(
@@ -37,23 +43,12 @@ export default function useInitialParticles(
     })
   }, [width, height, item, defaultFontFamily, alpha, pointSpacingCss])
 
-  useEffect(() => {
-    if (data) prevData.current = data
-  }, [data])
-
-  return data ?? prevData.current
+  return data
 }
 
-function shallowEqual(obj1: AnimateItem, obj2: AnimateItem): boolean {
-  const keys1 = Object.keys(obj1)
-  const keys2 = Object.keys(obj2)
-
-  if (keys1.length !== keys2.length) return false
-
-  for (const key of keys1) {
-    if (obj1[key as keyof AnimateItem] !== obj2[key as keyof AnimateItem])
-      return false
-  }
-
-  return true
+function shallowEqual<T extends object>(a: T, b: T): boolean {
+  if (a === b) return true
+  const keysA = Object.keys(a) as (keyof T)[]
+  if (keysA.length !== Object.keys(b).length) return false
+  return keysA.every((k) => a[k] === b[k])
 }
