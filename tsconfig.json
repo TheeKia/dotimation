@@ -20,7 +20,6 @@
     "declaration": true,
     "isolatedDeclarations": true,
 
-    "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"]
     },
