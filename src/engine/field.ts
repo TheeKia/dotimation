@@ -1,4 +1,5 @@
 import type { FieldTargets, ParticleField } from '@/types'
+import { buildTargetGrid, nearestTarget } from './collapse'
 import { planReconcile } from './reconcile-plan'
 
 const ARRAY_KEYS = [
@@ -124,8 +125,39 @@ export function reconcile(
   }
 
   for (let i = 0; i < plan.active; i++) retargetActive(f, i, targets)
-  for (let i = plan.active; i < plan.count; i++) f.targetAlpha[i] = 0
+  collapseFaders(f, plan.active, plan.count, targets)
   f.active = plan.active
   f.count = plan.count
   return f
+}
+
+/**
+ * Sends every fader [active, count) home to the nearest surviving target so it
+ * drifts into the new layout while fading, instead of dissolving in place at the
+ * old image's position. Falls back to fading in place when the new image is
+ * empty (no survivor to collapse toward).
+ */
+function collapseFaders(
+  f: ParticleField,
+  active: number,
+  count: number,
+  targets: FieldTargets,
+): void {
+  if (count <= active) return
+  if (targets.count === 0) {
+    for (let i = active; i < count; i++) f.targetAlpha[i] = 0
+    return
+  }
+  const grid = buildTargetGrid(targets, targets.count)
+  for (let i = active; i < count; i++) {
+    // Match from where the dot actually is so it collapses from its current
+    // spot; on settled fields this equals its home.
+    const j = nearestTarget(grid, f.x[i]!, f.y[i]!)
+    f.homeX[i] = targets.homeX[j]!
+    f.homeY[i] = targets.homeY[j]!
+    f.homeR[i] = targets.homeR[j]!
+    f.homeG[i] = targets.homeG[j]!
+    f.homeB[i] = targets.homeB[j]!
+    f.targetAlpha[i] = 0
+  }
 }

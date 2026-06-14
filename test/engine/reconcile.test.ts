@@ -22,6 +22,87 @@ function targets(positions: [number, number][]): FieldTargets {
   return t
 }
 
+// Like `targets` but with per-dot colors, so collapse tests can assert that a
+// fader adopts the color of the surviving dot it merges into.
+function coloredTargets(
+  rows: { x: number; y: number; r: number }[],
+): FieldTargets {
+  const n = rows.length
+  const t: FieldTargets = {
+    count: n,
+    homeX: new Float32Array(n),
+    homeY: new Float32Array(n),
+    homeR: new Float32Array(n),
+    homeG: new Float32Array(n),
+    homeB: new Float32Array(n),
+  }
+  rows.forEach(({ x, y, r }, i) => {
+    t.homeX[i] = x
+    t.homeY[i] = y
+    t.homeR[i] = r
+    t.homeG[i] = r
+    t.homeB[i] = r
+  })
+  return t
+}
+
+describe('reconcile — shrink collapses surplus toward survivors', () => {
+  test('retargets each fader home+color to its nearest surviving dot', () => {
+    // A: 10 dots along x = 0,10,...,90. B: 2 dots at x=0 and x=90.
+    let f = reconcile(
+      createField(1),
+      targets(Array.from({ length: 10 }, (_, i) => [i * 10, 0])),
+    )
+    f = reconcile(
+      f,
+      coloredTargets([
+        { x: 0, y: 0, r: 100 }, // survivor 0 (left)
+        { x: 90, y: 0, r: 200 }, // survivor 1 (right)
+      ]),
+    )
+
+    expect(f.active).toBe(2)
+    // Faders are slots [2,10); their old homes were x = 20..90.
+    // Left half collapses to the x=0 survivor, right half to the x=90 survivor.
+    expect(f.targetAlpha[2]).toBe(0)
+    expect(f.homeX[2]).toBe(0) // old x=20 -> nearest survivor x=0
+    expect(f.homeR[2]).toBe(100) // adopts that survivor's color
+    expect(f.homeX[9]).toBe(90) // old x=90 -> nearest survivor x=90
+    expect(f.homeR[9]).toBe(200)
+  })
+
+  test('a fader no longer keeps its own old home (it moves)', () => {
+    let f = reconcile(
+      createField(1),
+      targets([
+        [0, 0],
+        [1000, 1000], // far-away dot that will become a fader
+      ]),
+    )
+    f = reconcile(f, targets([[0, 0]])) // shrink to a single dot at origin
+    // Slot 1 faded; instead of staying at (1000,1000) it heads for the survivor.
+    expect(f.targetAlpha[1]).toBe(0)
+    expect(f.homeX[1]).toBe(0)
+    expect(f.homeY[1]).toBe(0)
+  })
+
+  test('empty new image leaves faders fading in place (nothing to collapse to)', () => {
+    let f = reconcile(
+      createField(1),
+      targets([
+        [5, 5],
+        [6, 6],
+      ]),
+    )
+    f = reconcile(f, { ...targets([]), count: 0 })
+    expect(f.active).toBe(0)
+    // No survivors to move toward, so homes are untouched (fade in place).
+    expect(f.homeX[0]).toBe(5)
+    expect(f.homeX[1]).toBe(6)
+    expect(f.targetAlpha[0]).toBe(0)
+  })
+})
+
 describe('reconcile — first load', () => {
   test('places actives at home with alpha 0, targetAlpha 1', () => {
     const f = reconcile(
