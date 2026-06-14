@@ -113,7 +113,18 @@ export function reconcile(
   for (let j = oldFaders - 1; j >= 0; j--)
     copySlot(f, oldActive + j, newActive + j)
   for (let i = oldActive; i < newActive; i++) {
-    copySlot(f, i % oldActive, i)
+    if (oldActive > 0) {
+      // Seed the fly-in from an existing active particle.
+      copySlot(f, i % oldActive, i)
+    } else {
+      // No prior actives to seed from (field held only faders): start at
+      // home, fully transparent, and fade in place — same as first load.
+      f.x[i] = targets.homeX[i]!
+      f.y[i] = targets.homeY[i]!
+      f.r[i] = targets.homeR[i]!
+      f.g[i] = targets.homeG[i]!
+      f.b[i] = targets.homeB[i]!
+    }
     f.vx[i] = 0
     f.vy[i] = 0
     f.alpha[i] = 0

@@ -104,4 +104,32 @@ describe('reconcile — growth', () => {
     expect(f.capacity).toBeGreaterThanOrEqual(50)
     expect(f.active).toBe(50)
   })
+
+  test('seeds new actives at home when field held only faders (no NaN)', () => {
+    // active 0 / count > 0 is reachable: rasterize to zero, then back to N.
+    let f = reconcile(
+      createField(1),
+      targets([
+        [1, 1],
+        [2, 2],
+      ]),
+    )
+    f = reconcile(f, { ...targets([]), count: 0 }) // all fade out → active 0
+    expect(f.active).toBe(0)
+    expect(f.count).toBe(2)
+    f = reconcile(
+      f,
+      targets([
+        [5, 5],
+        [6, 6],
+        [7, 7],
+      ]),
+    ) // growth from active 0
+    expect(f.active).toBe(3)
+    expect(Number.isFinite(f.x[0]!)).toBe(true)
+    expect(f.x[0]).toBe(5) // seeded at home
+    expect(f.homeX[2]).toBe(7)
+    expect(f.alpha[0]).toBe(0)
+    expect(f.targetAlpha[0]).toBe(1)
+  })
 })
