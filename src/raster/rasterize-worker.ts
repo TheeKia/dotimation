@@ -20,6 +20,9 @@ function getWorker(): Worker | null {
       new Blob([WORKER_SOURCE], { type: 'text/javascript' }),
     )
     worker = new Worker(url, { type: 'module' })
+    // The worker has its own reference to the resource now, so the object URL
+    // can be released immediately instead of leaking for the page's lifetime.
+    URL.revokeObjectURL(url)
     worker.onmessage = (e: MessageEvent): void => {
       const { id, targets, error } = e.data as {
         id: number

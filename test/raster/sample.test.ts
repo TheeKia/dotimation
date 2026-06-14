@@ -61,4 +61,45 @@ describe('sampleTargets maxParticles', () => {
     const t = sampleTargets(opaque(), 4, 4, 1, 1, 128, () => 0)
     expect(t.count).toBe(16)
   })
+
+  // Each pixel gets a unique color encoding its grid position so a kept target
+  // can be traced back to a real candidate. Guards the random-subset contract.
+  function tagged(): Uint8ClampedArray {
+    const p = new Uint8ClampedArray(4 * 4 * 4)
+    for (let y = 0; y < 4; y++) {
+      for (let x = 0; x < 4; x++) {
+        const i = (y * 4 + x) * 4
+        p[i] = x * 16
+        p[i + 1] = y * 16
+        p[i + 2] = 0
+        p[i + 3] = 255
+      }
+    }
+    return p
+  }
+
+  test('kept targets are a distinct valid subset of the candidates', () => {
+    let seed = 0.12345
+    const rand = (): number => {
+      seed = (seed * 9301 + 49297) % 233280
+      return seed / 233280
+    }
+    const t = sampleTargets(tagged(), 4, 4, 1, 1, 128, rand, 5)
+    expect(t.count).toBe(5)
+    const seen = new Set<string>()
+    for (let i = 0; i < t.count; i++) {
+      const x = t.homeX[i]!
+      const y = t.homeY[i]!
+      expect(x).toBeGreaterThanOrEqual(0)
+      expect(x).toBeLessThan(4)
+      expect(y).toBeGreaterThanOrEqual(0)
+      expect(y).toBeLessThan(4)
+      // color must match the candidate at (x, y)
+      expect(t.homeR[i]).toBe(x * 16)
+      expect(t.homeG[i]).toBe(y * 16)
+      const key = `${x},${y}`
+      expect(seen.has(key)).toBe(false)
+      seen.add(key)
+    }
+  })
 })

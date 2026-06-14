@@ -35,16 +35,18 @@ export function sampleTargets(
   }
 
   const n = xs.length
+  const keep = Math.min(n, Math.max(0, Math.floor(maxParticles)))
   const order = new Uint32Array(n)
   for (let i = 0; i < n; i++) order[i] = i
-  for (let i = n - 1; i > 0; i--) {
-    const j = (rand() * (i + 1)) | 0
+  // Partial Fisher–Yates: only the first `keep` picks are needed to draw a
+  // uniform random subset, so the shuffle is O(keep), not O(n). When uncapped
+  // (keep === n) this degrades gracefully to a full shuffle.
+  for (let i = 0; i < keep; i++) {
+    const j = i + ((rand() * (n - i)) | 0)
     const tmp = order[i]!
     order[i] = order[j]!
     order[j] = tmp
   }
-
-  const keep = Math.min(n, Math.max(0, Math.floor(maxParticles)))
   const t: FieldTargets = {
     count: keep,
     homeX: new Float32Array(keep),

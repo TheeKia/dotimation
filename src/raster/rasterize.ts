@@ -27,8 +27,10 @@ export async function rasterize(
 
   if (item.type === 'image') {
     const image = new Image()
-    image.src = item.data
+    // crossOrigin must be set BEFORE src or the request goes out without CORS,
+    // tainting the canvas and making getImageData throw for cross-origin images.
     image.crossOrigin = 'anonymous'
+    image.src = item.data
     await image.decode()
     drawImage(ctx, image, image.width, image.height, width, height, item)
   } else {

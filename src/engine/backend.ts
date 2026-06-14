@@ -24,7 +24,11 @@ export function detectCapabilities(): Capabilities {
   const webgpu = 'gpu' in navigator
   let webgl2 = false
   try {
-    webgl2 = !!document.createElement('canvas').getContext('webgl2')
+    const probe = document.createElement('canvas').getContext('webgl2')
+    webgl2 = !!probe
+    // Release the probe context immediately — browsers cap live WebGL contexts,
+    // and a GC'd canvas does not promptly free its context.
+    probe?.getExtension('WEBGL_lose_context')?.loseContext()
   } catch {
     webgl2 = false
   }

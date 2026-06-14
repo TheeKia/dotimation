@@ -32,7 +32,14 @@ async function construct(
 export async function selectBackend(
   opts: SelectOptions,
 ): Promise<{ backend: Backend; kind: ConcreteBackend }> {
-  const order = resolveBackendOrder(opts.requested, detectCapabilities())
+  // Only the 'auto' path consults capabilities; an explicit request ignores
+  // them (see resolveBackendOrder), so skip the GL probe — and its context
+  // allocation — entirely for non-auto requests.
+  const caps =
+    opts.requested === 'auto'
+      ? detectCapabilities()
+      : { webgpu: false, webgl2: false }
+  const order = resolveBackendOrder(opts.requested, caps)
   for (const kind of order) {
     let be: Backend | undefined
     try {

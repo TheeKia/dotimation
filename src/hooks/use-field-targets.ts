@@ -71,9 +71,18 @@ export function useFieldTargets(
           pointSpacingCss,
           maxParticles,
         )
-    task.then((t) => {
-      if (id === executionId.current) setTargets(t)
-    })
+    task
+      .then((t) => {
+        if (id === executionId.current) setTargets(t)
+      })
+      .catch((err) => {
+        // Rasterization can reject (e.g. a cross-origin image fails to load or
+        // the canvas is tainted). Don't leave the rejection unhandled; keep the
+        // previously rendered targets in place.
+        if (typeof console !== 'undefined') {
+          console.warn('[dotimation] rasterization failed', err)
+        }
+      })
   }, [
     width,
     height,

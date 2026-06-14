@@ -16,6 +16,7 @@ export function createCanvas2DBackend(opts: Canvas2DOptions): Backend {
   let devH = 0
   let dpr = 1
   let field: ParticleField | null = null
+  let dotSize = opts.dotSize
   const { k, c } = tuneSpring({ settleTime: SETTLE_TIME, zeta: ZETA })
 
   function ensureBuffer(): void {
@@ -38,6 +39,9 @@ export function createCanvas2DBackend(opts: Canvas2DOptions): Backend {
     uploadField(next): void {
       field = next
     },
+    setDotSize(next): void {
+      dotSize = next
+    },
     step(dt): void {
       if (field) stepField(field, dt, k, c)
     },
@@ -45,7 +49,7 @@ export function createCanvas2DBackend(opts: Canvas2DOptions): Backend {
       if (!ctx || !field) return
       ensureBuffer()
       if (!imageData || !view) return
-      renderField(view, field, devW, devH, dpr, opts.dotSize)
+      renderField(view, field, devW, devH, dpr, dotSize)
       ctx.putImageData(imageData, 0, 0)
     },
     resize(w, h): void {

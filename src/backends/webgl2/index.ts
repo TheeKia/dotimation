@@ -38,6 +38,8 @@ export function createWebGL2Backend(opts: WebGL2Options): Backend {
   let active = 0
   let lost = false
   let lastUpload = 0
+  let dotSize = opts.dotSize
+  let lastField: ParticleField | null = null
   const { k, c } = tuneSpring({ settleTime: SETTLE_TIME, zeta: ZETA })
   // Faders fade out at OPACITY_RATE; after this long they are invisible and the
   // tail can be dropped. The Canvas2D backend compacts faders in stepField; the
@@ -49,9 +51,32 @@ export function createWebGL2Backend(opts: WebGL2Options): Backend {
     lost = true
   }
   const onRestored = (): void => {
-    // Best-effort: rebuild GL resources; field will be re-uploaded on next reconcile.
-    if (canvasEl) init(canvasEl, dpr)
+    // The same context object is reused after a restore, but every GL resource
+    // was lost. Rebuild them, reset the live counts so the next upload is a
+    // fresh load, and re-seed from the last field so the canvas isn't blank
+    // until the next reconcile happens to fire.
+    if (!gl) return
+    active = 0
+    count = 0
+    buildResources()
     lost = false
+    if (lastField) api.uploadField(lastField)
+  }
+
+  function buildResources(): void {
+    if (!gl) return
+    buffers = createBuffers(gl, 1024)
+    sim = createSimProgram(gl)
+    draw = createDrawProgram(gl)
+    gl.disable(gl.DEPTH_TEST)
+    gl.enable(gl.BLEND)
+    gl.blendFuncSeparate(
+      gl.SRC_ALPHA,
+      gl.ONE_MINUS_SRC_ALPHA,
+      gl.ONE,
+      gl.ONE_MINUS_SRC_ALPHA,
+    )
+    gl.viewport(0, 0, devW, devH)
   }
 
   function ensureCapacity(cap: number): void {
@@ -85,26 +110,18 @@ export function createWebGL2Backend(opts: WebGL2Options): Backend {
     const context = getGL(canvas)
     if (!context) throw new Error('webgl2: context unavailable')
     gl = context
+    // Listeners are added once here (not in buildResources) so a context
+    // restore doesn't stack duplicate handlers.
     canvas.addEventListener('webglcontextlost', onLost, false)
     canvas.addEventListener('webglcontextrestored', onRestored, false)
-    buffers = createBuffers(gl, 1024)
-    sim = createSimProgram(gl)
-    draw = createDrawProgram(gl)
-    gl.disable(gl.DEPTH_TEST)
-    gl.enable(gl.BLEND)
-    gl.blendFuncSeparate(
-      gl.SRC_ALPHA,
-      gl.ONE_MINUS_SRC_ALPHA,
-      gl.ONE,
-      gl.ONE_MINUS_SRC_ALPHA,
-    )
-    gl.viewport(0, 0, devW, devH)
+    buildResources()
   }
 
-  return {
+  const api: Backend = {
     init,
     uploadField(field: ParticleField): void {
       if (!gl || !buffers) return
+      lastField = field
       const plan = planReconcile(active, count, field.active) // field.active == new targets.count
       ensureCapacity(field.capacity)
       const b = buffers
@@ -163,6 +180,9 @@ export function createWebGL2Backend(opts: WebGL2Options): Backend {
       count = plan.count
       lastUpload = performance.now()
     },
+    setDotSize(next: number): void {
+      dotSize = next
+    },
     step(dt: number): void {
       if (!gl || !buffers || !sim || lost || count <= 0) return
       // Drop fully-faded faders (the GPU sim never shrinks count itself).
@@ -192,7 +212,7 @@ export function createWebGL2Backend(opts: WebGL2Options): Backend {
         devW,
         devH,
         dpr,
-        dotSize: opts.dotSize,
+        dotSize,
       })
     },
     resize(w: number, h: number): void {
@@ -214,4 +234,5 @@ export function createWebGL2Backend(opts: WebGL2Options): Backend {
       draw = null
     },
   }
+  return api
 }

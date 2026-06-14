@@ -5,6 +5,10 @@ export function getGL(
     premultipliedAlpha: true,
     alpha: true,
     antialias: false,
+    // The engine skips draw() on frames with no physics step; preserve the
+    // drawing buffer so those frames keep the last rendered image instead of
+    // compositing a cleared buffer (which would flicker on high-refresh displays).
+    preserveDrawingBuffer: true,
   })
 }
 

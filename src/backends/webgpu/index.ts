@@ -36,6 +36,7 @@ export function createWebGPUBackend(opts: WebGPUOptions): Backend {
   let active = 0
   let lost = false
   let lastUpload = 0
+  let dotSize = opts.dotSize
   const { k, c } = tuneSpring({ settleTime: SETTLE_TIME, zeta: ZETA })
   const FADE_DURATION_MS = (1 / OPACITY_RATE + 0.15) * 1000
 
@@ -122,6 +123,9 @@ export function createWebGPUBackend(opts: WebGPUOptions): Backend {
       count = plan.count
       lastUpload = performance.now()
     },
+    setDotSize(next: number): void {
+      dotSize = next
+    },
     step(dt: number): void {
       if (!device || !buffers || !pipelines || lost || count <= 0) return
       if (count > active && performance.now() - lastUpload > FADE_DURATION_MS) {
@@ -161,7 +165,7 @@ export function createWebGPUBackend(opts: WebGPUOptions): Backend {
       device.queue.writeBuffer(
         pipelines.renderUniform,
         0,
-        new Float32Array([devW, devH, dpr, opts.dotSize]),
+        new Float32Array([devW, devH, dpr, dotSize]),
       )
       const enc = device.createCommandEncoder()
       const view = context.getCurrentTexture().createView()

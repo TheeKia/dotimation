@@ -63,6 +63,8 @@ export interface DotimationStats {
 export interface Backend {
   init(canvas: HTMLCanvasElement, dpr: number): Promise<void> | void
   uploadField(field: ParticleField): void
+  /** Update the dot footprint (in CSS px). Read at draw time; no re-init needed. */
+  setDotSize(dotSize: number): void
   step(dt: number): void
   draw(): void
   resize(devW: number, devH: number): void

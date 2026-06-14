@@ -66,24 +66,22 @@ export function stepField(
     if (targetAlpha[i]! < 0.5 && alpha[i]! <= 0.001) {
       const last = field.count - 1
       if (i !== last) {
-        for (const key of [
-          'x',
-          'y',
-          'vx',
-          'vy',
-          'homeX',
-          'homeY',
-          'r',
-          'g',
-          'b',
-          'homeR',
-          'homeG',
-          'homeB',
-          'alpha',
-          'targetAlpha',
-        ] as const) {
-          field[key][i] = field[key][last]!
-        }
+        // Inlined swap over the destructured SoA views — avoids allocating a
+        // key array and doing dynamic property access per compacted fader.
+        x[i] = x[last]!
+        y[i] = y[last]!
+        vx[i] = vx[last]!
+        vy[i] = vy[last]!
+        homeX[i] = homeX[last]!
+        homeY[i] = homeY[last]!
+        r[i] = r[last]!
+        g[i] = g[last]!
+        b[i] = b[last]!
+        homeR[i] = homeR[last]!
+        homeG[i] = homeG[last]!
+        homeB[i] = homeB[last]!
+        alpha[i] = alpha[last]!
+        targetAlpha[i] = targetAlpha[last]!
       }
       field.count--
     }

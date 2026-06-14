@@ -62,6 +62,11 @@ export default function Dotimation({
   const kindRef = useRef<DotimationStats['backend']>('canvas2d')
   const onStatsRef = useRef(onStats)
   onStatsRef.current = onStats
+  // dotSize is read at draw time, so it can update live without recreating the
+  // engine. The creation effect reads it through this ref to avoid listing it
+  // as a dependency (which would tear down the engine and reset the field).
+  const dotSizeRef = useRef(dotSize)
+  dotSizeRef.current = dotSize
 
   useImperativeHandle(canvasRef, () => ref.current!)
 
@@ -87,7 +92,7 @@ export default function Dotimation({
     void (async () => {
       const { backend: be, kind } = await selectBackend({
         requested: backend,
-        dotSize,
+        dotSize: dotSizeRef.current,
         canvas,
         dpr,
       })
@@ -114,7 +119,13 @@ export default function Dotimation({
       engine?.dispose()
       engineRef.current = null
     }
-  }, [width, height, backend, dotSize, idle])
+  }, [width, height, backend, idle])
+
+  // dotSize only affects draw-time rendering, so push it to the live backend
+  // instead of recreating the engine (which would reset every particle).
+  useEffect(() => {
+    engineRef.current?.setDotSize(dotSize)
+  }, [dotSize])
 
   // Push new targets into the live field whenever rasterization produces them.
   useEffect(() => {
