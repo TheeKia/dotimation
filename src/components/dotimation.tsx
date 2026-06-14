@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useImperativeHandle, useRef } from 'react'
+import { createCanvas2DBackend } from '@/backends/canvas2d'
 import { createEngine, type Engine } from '@/engine/engine'
 import { createField, reconcile } from '@/engine/field'
 import { selectBackend } from '@/engine/select'
@@ -12,7 +13,7 @@ import type {
   IdleBehavior,
   ParticleField,
 } from '@/types'
-import { getCtx } from '@/utils/utils'
+import { sizeCanvas } from '@/utils/utils'
 
 type DotimationProps = {
   item: AnimateItem
@@ -69,22 +70,41 @@ export default function Dotimation({
   useEffect(() => {
     const canvas = ref.current
     if (!canvas) return
-    const dpr = Math.min(window.devicePixelRatio || 1, 2)
-    const ctx = getCtx(canvas, width, height)
-    if (!ctx) return
-    const be = selectBackend({ requested: backend, dotSize })
-    be.init(canvas, dpr)
-    const engine = createEngine({ backend: be, canvas, dpr, idle })
-    engineRef.current = engine
-    fieldRef.current = createField(1024)
-    // Seed the fresh engine with the latest targets so changing dotSize/backend
-    // (which recreates the engine but not the targets) doesn't blank the canvas.
-    if (targetsRef.current) {
-      fieldRef.current = reconcile(fieldRef.current, targetsRef.current)
-      engine.setField(fieldRef.current)
-    }
+    let cancelled = false
+    let engine: Engine | null = null
+
+    const dpr = sizeCanvas(canvas, width, height)
+
+    void (async () => {
+      let be = await selectBackend({ requested: backend, dotSize })
+      if (cancelled) {
+        be.dispose()
+        return
+      }
+      try {
+        await be.init(canvas, dpr)
+      } catch {
+        // WebGL2 init failed at runtime — fall back to Canvas2D.
+        be.dispose()
+        be = createCanvas2DBackend({ dotSize })
+        await be.init(canvas, dpr)
+      }
+      if (cancelled) {
+        be.dispose()
+        return
+      }
+      engine = createEngine({ backend: be, canvas, dpr, idle })
+      engineRef.current = engine
+      fieldRef.current = createField(1024)
+      if (targetsRef.current) {
+        fieldRef.current = reconcile(fieldRef.current, targetsRef.current)
+        engine.setField(fieldRef.current)
+      }
+    })()
+
     return () => {
-      engine.dispose()
+      cancelled = true
+      engine?.dispose()
       engineRef.current = null
     }
   }, [width, height, backend, dotSize, idle])
