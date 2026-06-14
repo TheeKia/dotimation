@@ -40,6 +40,27 @@ export function createWebGPUBackend(opts: WebGPUOptions): Backend {
   const { k, c } = tuneSpring({ settleTime: SETTLE_TIME, zeta: ZETA })
   const FADE_DURATION_MS = (1 / OPACITY_RATE + 0.15) * 1000
 
+  // Bind groups and uniform staging are stable across frames, so they are
+  // created once (and rebuilt only when the buffers are recreated) instead of
+  // per step/draw. simBindGroups is indexed by the ping-pong read index.
+  let simBindGroups: [GPUBindGroup, GPUBindGroup] | null = null
+  let renderBind: GPUBindGroup | null = null
+  const simU = new Float32Array(8)
+  const renderU = new Float32Array(4)
+  // The render uniforms (devW/devH/dpr/dotSize) change only on resize/dotSize,
+  // so the GPU write is skipped on frames where they are unchanged.
+  let renderUniformDirty = true
+
+  function rebuildBindGroups(): void {
+    if (!device || !pipelines || !buffers) return
+    const b = buffers
+    simBindGroups = [
+      pipelines.simBindGroup(b.state[0], b.state[1], b.targets),
+      pipelines.simBindGroup(b.state[1], b.state[0], b.targets),
+    ]
+    renderBind = pipelines.renderBindGroup()
+  }
+
   function ensureCapacity(cap: number): void {
     if (!device || !buffers || buffers.capacity >= cap) return
     const old = buffers
@@ -58,6 +79,8 @@ export function createWebGPUBackend(opts: WebGPUOptions): Backend {
     next.read = 0
     disposeBuffers(old)
     buffers = next
+    // The cached bind groups referenced the disposed buffers; rebuild them.
+    rebuildBindGroups()
   }
 
   return {
@@ -70,6 +93,7 @@ export function createWebGPUBackend(opts: WebGPUOptions): Backend {
       context = setup.context
       pipelines = createPipelines(device, setup.format)
       buffers = createBuffers(device, 1024)
+      rebuildBindGroups()
       void device.lost.then(() => {
         lost = true
       })
@@ -125,48 +149,45 @@ export function createWebGPUBackend(opts: WebGPUOptions): Backend {
     },
     setDotSize(next: number): void {
       dotSize = next
+      renderUniformDirty = true
     },
     step(dt: number): void {
-      if (!device || !buffers || !pipelines || lost || count <= 0) return
+      if (!device || !buffers || !pipelines || !simBindGroups || lost) return
+      if (count <= 0) return
       if (count > active && performance.now() - lastUpload > FADE_DURATION_MS) {
         count = active
       }
       const b = buffers
-      const u = new Float32Array([
-        dt,
-        k,
-        c,
-        COLOR_RATE,
-        OPACITY_RATE,
-        JITTER_AMOUNT,
-        Math.random() * 1000,
-        count,
-      ])
-      device.queue.writeBuffer(pipelines.simUniform, 0, u)
+      simU[0] = dt
+      simU[1] = k
+      simU[2] = c
+      simU[3] = COLOR_RATE
+      simU[4] = OPACITY_RATE
+      simU[5] = JITTER_AMOUNT
+      simU[6] = Math.random() * 1000
+      simU[7] = count
+      device.queue.writeBuffer(pipelines.simUniform, 0, simU)
       const enc = device.createCommandEncoder()
       const pass = enc.beginComputePass()
       pass.setPipeline(pipelines.compute)
-      pass.setBindGroup(
-        0,
-        pipelines.simBindGroup(
-          b.state[b.read]!,
-          b.state[b.read ^ 1]!,
-          b.targets,
-        ),
-      )
+      pass.setBindGroup(0, simBindGroups[b.read])
       pass.dispatchWorkgroups(Math.ceil(count / 64))
       pass.end()
       device.queue.submit([enc.finish()])
       b.read = (b.read ^ 1) as 0 | 1
     },
     draw(): void {
-      if (!device || !context || !buffers || !pipelines || lost) return
+      if (!device || !context || !buffers || !pipelines || !renderBind || lost)
+        return
       const b = buffers
-      device.queue.writeBuffer(
-        pipelines.renderUniform,
-        0,
-        new Float32Array([devW, devH, dpr, dotSize]),
-      )
+      if (renderUniformDirty) {
+        renderU[0] = devW
+        renderU[1] = devH
+        renderU[2] = dpr
+        renderU[3] = dotSize
+        device.queue.writeBuffer(pipelines.renderUniform, 0, renderU)
+        renderUniformDirty = false
+      }
       const enc = device.createCommandEncoder()
       const view = context.getCurrentTexture().createView()
       const pass = enc.beginRenderPass({
@@ -181,7 +202,7 @@ export function createWebGPUBackend(opts: WebGPUOptions): Backend {
       })
       if (count > 0) {
         pass.setPipeline(pipelines.render)
-        pass.setBindGroup(0, pipelines.renderBindGroup())
+        pass.setBindGroup(0, renderBind)
         pass.setVertexBuffer(0, b.quad)
         pass.setVertexBuffer(1, b.state[b.read]!)
         pass.draw(4, count)
@@ -192,6 +213,7 @@ export function createWebGPUBackend(opts: WebGPUOptions): Backend {
     resize(w: number, h: number): void {
       devW = w
       devH = h
+      renderUniformDirty = true
     },
     dispose(): void {
       if (buffers) disposeBuffers(buffers)
@@ -201,6 +223,8 @@ export function createWebGPUBackend(opts: WebGPUOptions): Backend {
       context = null
       pipelines = null
       buffers = null
+      simBindGroups = null
+      renderBind = null
     },
   }
 }

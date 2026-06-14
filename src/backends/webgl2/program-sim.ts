@@ -20,13 +20,19 @@ export interface SimUniforms {
 }
 
 export interface SimProgram {
-  step(
-    read: WebGLBuffer,
-    write: WebGLBuffer,
+  /**
+   * (Re)bind the ping-pong state buffers and the shared targets buffer. Bakes
+   * the attribute layout into one VAO per read index so `step` only swaps VAOs
+   * instead of re-issuing every vertexAttribPointer. Call after the buffers are
+   * created or grown.
+   */
+  setBuffers(
+    state0: WebGLBuffer,
+    state1: WebGLBuffer,
     targets: WebGLBuffer,
-    count: number,
-    u: SimUniforms,
   ): void
+  /** Advance the sim, reading state[read] (+targets) and writing state[read^1]. */
+  step(read: 0 | 1, count: number, u: SimUniforms): void
   dispose(): void
 }
 
@@ -56,61 +62,74 @@ export function createSimProgram(gl: WebGL2RenderingContext): SimProgram {
     uJitter: gl.getUniformLocation(program, 'uJitter'),
     uSeed: gl.getUniformLocation(program, 'uSeed'),
   }
-  const vao = gl.createVertexArray()
   const tf = gl.createTransformFeedback()
+  let vaos: [WebGLVertexArrayObject, WebGLVertexArrayObject] | null = null
+  // The write buffer is a transform-feedback target (bound via bindBufferBase,
+  // not part of the VAO), so it's tracked here to derive it from `read`.
+  let states: [WebGLBuffer, WebGLBuffer] | null = null
+
+  function buildVao(
+    read: WebGLBuffer,
+    targets: WebGLBuffer,
+  ): WebGLVertexArrayObject {
+    const vao = gl.createVertexArray()
+    if (!vao) throw new Error('webgl2: createVertexArray failed')
+    gl.bindVertexArray(vao)
+    gl.bindBuffer(gl.ARRAY_BUFFER, read)
+    gl.enableVertexAttribArray(loc.aPos)
+    gl.vertexAttribPointer(loc.aPos, 2, gl.FLOAT, false, STATE_STRIDE, 0)
+    gl.enableVertexAttribArray(loc.aVel)
+    gl.vertexAttribPointer(loc.aVel, 2, gl.FLOAT, false, STATE_STRIDE, 2 * 4)
+    gl.enableVertexAttribArray(loc.aColor)
+    gl.vertexAttribPointer(loc.aColor, 3, gl.FLOAT, false, STATE_STRIDE, 4 * 4)
+    gl.enableVertexAttribArray(loc.aAlpha)
+    gl.vertexAttribPointer(loc.aAlpha, 1, gl.FLOAT, false, STATE_STRIDE, 7 * 4)
+    gl.bindBuffer(gl.ARRAY_BUFFER, targets)
+    gl.enableVertexAttribArray(loc.aHomePos)
+    gl.vertexAttribPointer(loc.aHomePos, 2, gl.FLOAT, false, TARGET_STRIDE, 0)
+    gl.enableVertexAttribArray(loc.aHomeColor)
+    gl.vertexAttribPointer(
+      loc.aHomeColor,
+      3,
+      gl.FLOAT,
+      false,
+      TARGET_STRIDE,
+      2 * 4,
+    )
+    gl.enableVertexAttribArray(loc.aTargetAlpha)
+    gl.vertexAttribPointer(
+      loc.aTargetAlpha,
+      1,
+      gl.FLOAT,
+      false,
+      TARGET_STRIDE,
+      5 * 4,
+    )
+    gl.bindVertexArray(null)
+    return vao
+  }
 
   return {
-    step(read, write, targets, count, u): void {
-      if (count <= 0) return
+    setBuffers(state0, state1, targets): void {
+      if (vaos) {
+        gl.deleteVertexArray(vaos[0])
+        gl.deleteVertexArray(vaos[1])
+      }
+      states = [state0, state1]
+      vaos = [buildVao(state0, targets), buildVao(state1, targets)]
+    },
+    step(read, count, u): void {
+      if (count <= 0 || !vaos || !states) return
+      const write = states[(read ^ 1) as 0 | 1]
       // biome-ignore lint/correctness/useHookAtTopLevel: gl.useProgram is a WebGL method, not a React hook
       gl.useProgram(program)
-      gl.bindVertexArray(vao)
-
-      gl.bindBuffer(gl.ARRAY_BUFFER, read)
-      gl.enableVertexAttribArray(loc.aPos)
-      gl.vertexAttribPointer(loc.aPos, 2, gl.FLOAT, false, STATE_STRIDE, 0)
-      gl.enableVertexAttribArray(loc.aVel)
-      gl.vertexAttribPointer(loc.aVel, 2, gl.FLOAT, false, STATE_STRIDE, 2 * 4)
-      gl.enableVertexAttribArray(loc.aColor)
-      gl.vertexAttribPointer(
-        loc.aColor,
-        3,
-        gl.FLOAT,
-        false,
-        STATE_STRIDE,
-        4 * 4,
-      )
-      gl.enableVertexAttribArray(loc.aAlpha)
-      gl.vertexAttribPointer(
-        loc.aAlpha,
-        1,
-        gl.FLOAT,
-        false,
-        STATE_STRIDE,
-        7 * 4,
-      )
-
-      gl.bindBuffer(gl.ARRAY_BUFFER, targets)
-      gl.enableVertexAttribArray(loc.aHomePos)
-      gl.vertexAttribPointer(loc.aHomePos, 2, gl.FLOAT, false, TARGET_STRIDE, 0)
-      gl.enableVertexAttribArray(loc.aHomeColor)
-      gl.vertexAttribPointer(
-        loc.aHomeColor,
-        3,
-        gl.FLOAT,
-        false,
-        TARGET_STRIDE,
-        2 * 4,
-      )
-      gl.enableVertexAttribArray(loc.aTargetAlpha)
-      gl.vertexAttribPointer(
-        loc.aTargetAlpha,
-        1,
-        gl.FLOAT,
-        false,
-        TARGET_STRIDE,
-        5 * 4,
-      )
+      gl.bindVertexArray(vaos[read])
+      // The VAO already carries every attribute→buffer association, so clear the
+      // global ARRAY_BUFFER binding. Otherwise a state buffer left bound there by
+      // uploadField/draw can collide with the transform-feedback output buffer
+      // (a buffer can't be a TF target and bound elsewhere), which the driver
+      // rejects with GL_INVALID_OPERATION — silently dropping the sim write.
+      gl.bindBuffer(gl.ARRAY_BUFFER, null)
 
       gl.uniform1f(loc.uDt, u.dt)
       gl.uniform1f(loc.uK, u.k)
@@ -133,8 +152,11 @@ export function createSimProgram(gl: WebGL2RenderingContext): SimProgram {
     },
     dispose(): void {
       gl.deleteProgram(program)
-      if (vao) gl.deleteVertexArray(vao)
       if (tf) gl.deleteTransformFeedback(tf)
+      if (vaos) {
+        gl.deleteVertexArray(vaos[0])
+        gl.deleteVertexArray(vaos[1])
+      }
     },
   }
 }

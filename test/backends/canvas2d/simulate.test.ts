@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { stepField } from '@/backends/canvas2d/simulate'
+import { COLOR_RATE, JITTER_AMOUNT } from '@/engine/constants'
 import { createField, reconcile } from '@/engine/field'
 import { tuneSpring } from '@/engine/settle'
 import type { FieldTargets } from '@/types'
@@ -26,6 +27,35 @@ describe('stepField', () => {
       stepField(f, 1 / 90, spring.k, spring.c, () => 0.5)
     expect(f.x[0]).toBeCloseTo(50, 0)
     expect(f.alpha[0]).toBeCloseTo(1, 2)
+  })
+
+  test('eases color toward home at COLOR_RATE in a single step', () => {
+    const f = reconcile(createField(1), one(0, 0))
+    f.r[0] = 0
+    f.g[0] = 0
+    f.b[0] = 0
+    f.alpha[0] = 1
+    const dt = 1 / 90
+    stepField(f, dt, spring.k, spring.c, () => 0.5)
+    // home color is 200 (see `one`); ease factor is 1 - exp(-rate*dt).
+    const expected = 200 * (1 - Math.exp(-COLOR_RATE * dt))
+    expect(f.r[0]).toBeCloseTo(expected, 5)
+    expect(f.g[0]).toBeCloseTo(expected, 5)
+    expect(f.b[0]).toBeCloseTo(expected, 5)
+  })
+
+  test('applies x-only jitter sourced from rand', () => {
+    const f = reconcile(createField(1), one(0, 0))
+    // At home with zero velocity the spring contributes nothing, isolating jitter.
+    f.x[0] = 0
+    f.y[0] = 0
+    f.vx[0] = 0
+    f.vy[0] = 0
+    f.alpha[0] = 1
+    // rand=1 → (1 - 0.5) * JITTER_AMOUNT nudge on X, none on Y.
+    stepField(f, 1 / 90, spring.k, spring.c, () => 1)
+    expect(f.x[0]).toBeCloseTo(0.5 * JITTER_AMOUNT, 5)
+    expect(f.y[0]).toBe(0)
   })
 
   test('compacts a fully faded fader out of count', () => {

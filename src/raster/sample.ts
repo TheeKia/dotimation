@@ -15,26 +15,30 @@ export function sampleTargets(
   maxParticles: number = Number.POSITIVE_INFINITY,
 ): FieldTargets {
   const step = Math.max(1, Math.round(pointSpacingCss * dpr))
-  const xs: number[] = []
-  const ys: number[] = []
-  const rs: number[] = []
-  const gs: number[] = []
-  const bs: number[] = []
+  // The grid has at most ceil(devW/step) * ceil(devH/step) cells, so the
+  // candidate arrays are preallocated to that bound and filled with a cursor —
+  // avoiding boxed number[] growth and the GC churn of push() on large images.
+  const maxN = Math.ceil(devW / step) * Math.ceil(devH / step)
+  const xs = new Float32Array(maxN)
+  const ys = new Float32Array(maxN)
+  const rs = new Uint8Array(maxN)
+  const gs = new Uint8Array(maxN)
+  const bs = new Uint8Array(maxN)
+  let n = 0
 
   for (let yDev = 0; yDev < devH; yDev += step) {
     for (let xDev = 0; xDev < devW; xDev += step) {
       const idx = (yDev * devW + xDev) * 4
       if (pixels[idx + 3]! > alpha) {
-        xs.push(xDev / dpr)
-        ys.push(yDev / dpr)
-        rs.push(pixels[idx]!)
-        gs.push(pixels[idx + 1]!)
-        bs.push(pixels[idx + 2]!)
+        xs[n] = xDev / dpr
+        ys[n] = yDev / dpr
+        rs[n] = pixels[idx]!
+        gs[n] = pixels[idx + 1]!
+        bs[n] = pixels[idx + 2]!
+        n++
       }
     }
   }
-
-  const n = xs.length
   const keep = Math.min(n, Math.max(0, Math.floor(maxParticles)))
   const order = new Uint32Array(n)
   for (let i = 0; i < n; i++) order[i] = i

@@ -68,6 +68,8 @@ export function createWebGL2Backend(opts: WebGL2Options): Backend {
     buffers = createBuffers(gl, 1024)
     sim = createSimProgram(gl)
     draw = createDrawProgram(gl)
+    sim.setBuffers(buffers.state[0], buffers.state[1], buffers.targets)
+    draw.setBuffers(buffers.state[0], buffers.state[1], buffers.quad)
     gl.disable(gl.DEPTH_TEST)
     gl.enable(gl.BLEND)
     gl.blendFuncSeparate(
@@ -100,6 +102,9 @@ export function createWebGL2Backend(opts: WebGL2Options): Backend {
     next.read = 0
     disposeBuffers(gl, old)
     buffers = next
+    // The old VAOs referenced the disposed buffers; rebind them to the new ones.
+    sim?.setBuffers(next.state[0], next.state[1], next.targets)
+    draw?.setBuffers(next.state[0], next.state[1], next.quad)
   }
 
   function init(canvas: HTMLCanvasElement, devicePixelRatio: number): void {
@@ -191,7 +196,7 @@ export function createWebGL2Backend(opts: WebGL2Options): Backend {
       }
       const b = buffers
       // Jitter every step, matching the Canvas2D backend's shimmer frequency.
-      sim.step(b.state[b.read]!, b.state[b.read ^ 1]!, b.targets, count, {
+      sim.step(b.read, count, {
         dt,
         k,
         c,
@@ -208,7 +213,7 @@ export function createWebGL2Backend(opts: WebGL2Options): Backend {
       gl.clearColor(0, 0, 0, 0)
       gl.clear(gl.COLOR_BUFFER_BIT)
       const b = buffers
-      draw.use(b.state[b.read], b.quad, count, {
+      draw.use(b.read, count, {
         devW,
         devH,
         dpr,
