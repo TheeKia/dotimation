@@ -1,5 +1,6 @@
 import type { Backend, IdleBehavior, ParticleField } from '@/types'
-import { accumulate } from './clock'
+import { accumulate, FIXED_DT } from './clock'
+import { OPACITY_RATE, SETTLE_TIME } from './constants'
 import { computeSettleDuration } from './settle'
 
 export interface EngineOptions {
@@ -9,10 +10,15 @@ export interface EngineOptions {
   idle: IdleBehavior
 }
 
-const SETTLE_SECONDS = computeSettleDuration(0.85, 2)
+const SETTLE_SECONDS = computeSettleDuration(SETTLE_TIME, OPACITY_RATE)
 
 export interface Engine {
   setField(field: ParticleField): void
+  /**
+   * Resize in place without tearing down the engine. Unused in P0 (the React
+   * component recreates the engine on size change); wired for P1/P2 where GPU
+   * backends will resize live to avoid losing simulation state.
+   */
   resize(devW: number, devH: number): void
   dispose(): void
 }
@@ -30,7 +36,7 @@ export function createEngine(opts: EngineOptions): Engine {
     const r = accumulate(accumulator, (now - last) / 1000)
     last = now
     accumulator = r.accumulator
-    for (let i = 0; i < r.steps; i++) backend.step(1 / 90)
+    for (let i = 0; i < r.steps; i++) backend.step(FIXED_DT)
     backend.draw()
     if (idle === 'sleep' && now >= awakeUntil) {
       stop()
@@ -63,7 +69,9 @@ export function createEngine(opts: EngineOptions): Engine {
       ? new IntersectionObserver((entries) => {
           visible = entries[0]?.isIntersecting ?? true
           if (visible) {
-            if (performance.now() < awakeUntil) start()
+            // In 'animate' mode the loop must run whenever on-screen; in
+            // 'sleep' mode only resume if we're still inside the wake window.
+            if (idle === 'animate' || performance.now() < awakeUntil) start()
           } else {
             stop()
           }

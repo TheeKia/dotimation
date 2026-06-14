@@ -1,3 +1,4 @@
+import { SETTLE_TIME, ZETA } from '@/engine/constants'
 import { tuneSpring } from '@/engine/settle'
 import type { Backend, ParticleField } from '@/types'
 import { renderField } from './render'
@@ -15,7 +16,7 @@ export function createCanvas2DBackend(opts: Canvas2DOptions): Backend {
   let devH = 0
   let dpr = 1
   let field: ParticleField | null = null
-  const { k, c } = tuneSpring({ settleTime: 0.85, zeta: 1 })
+  const { k, c } = tuneSpring({ settleTime: SETTLE_TIME, zeta: ZETA })
 
   function ensureBuffer(): void {
     if (!ctx) return
