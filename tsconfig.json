@@ -20,6 +20,8 @@
     "declaration": true,
     "isolatedDeclarations": true,
 
+    "types": ["@webgpu/types"],
+
     "paths": {
       "@/*": ["./src/*"]
     },

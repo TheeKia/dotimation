@@ -121,19 +121,21 @@ export function App() {
             {label}
           </button>
         ))}
-        {(['auto', 'canvas2d', 'webgl2'] as BackendKind[]).map((b) => (
-          <button
-            key={b}
-            type="button"
-            onClick={() => setBackend(b)}
-            className={clsx(
-              'cursor-pointer hover:bg-primary/10 px-2 h-7 rounded-md text-xs',
-              backend === b && 'bg-primary/10',
-            )}
-          >
-            {b}
-          </button>
-        ))}
+        {(['auto', 'canvas2d', 'webgl2', 'webgpu'] as BackendKind[]).map(
+          (b) => (
+            <button
+              key={b}
+              type="button"
+              onClick={() => setBackend(b)}
+              className={clsx(
+                'cursor-pointer hover:bg-primary/10 px-2 h-7 rounded-md text-xs',
+                backend === b && 'bg-primary/10',
+              )}
+            >
+              {b}
+            </button>
+          ),
+        )}
         <button
           type="button"
           onClick={() => setDotSize((d) => (d === 1 ? 2 : 1))}

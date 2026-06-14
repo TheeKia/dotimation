@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useImperativeHandle, useRef } from 'react'
-import { createCanvas2DBackend } from '@/backends/canvas2d'
 import { createEngine, type Engine } from '@/engine/engine'
 import { createField, reconcile } from '@/engine/field'
 import { selectBackend } from '@/engine/select'
@@ -76,19 +75,12 @@ export default function Dotimation({
     const dpr = sizeCanvas(canvas, width, height)
 
     void (async () => {
-      let be = await selectBackend({ requested: backend, dotSize })
-      if (cancelled) {
-        be.dispose()
-        return
-      }
-      try {
-        await be.init(canvas, dpr)
-      } catch {
-        // WebGL2 init failed at runtime — fall back to Canvas2D.
-        be.dispose()
-        be = createCanvas2DBackend({ dotSize })
-        await be.init(canvas, dpr)
-      }
+      const be = await selectBackend({
+        requested: backend,
+        dotSize,
+        canvas,
+        dpr,
+      })
       if (cancelled) {
         be.dispose()
         return
@@ -118,7 +110,12 @@ export default function Dotimation({
   }, [targets])
 
   return (
+    // A canvas can only ever hold one context type ('2d' | 'webgl2' | 'webgpu')
+    // for its lifetime. Keying on `backend` remounts a fresh canvas when the
+    // backend changes, so the new backend can acquire its own context type
+    // instead of reusing a canvas already bound to a different one.
     <canvas
+      key={backend}
       ref={ref}
       className={className}
       width={width}

@@ -32,12 +32,12 @@ The library is one data flow from source content to animated pixels. There is a 
 
 3. **Orchestrator** (`src/engine/engine.ts`) — owns the rAF loop, a fixed-timestep accumulator (`src/engine/clock.ts`, 90 Hz physics), deterministic settle/sleep (`src/engine/settle.ts` — stops the loop ~1.5 s after the last change, so idle CPU cost is ~0%), and an `IntersectionObserver` for visibility gating. Exposes `setField` / `resize` / `dispose` and drives a `Backend` interface.
 
-4. **Backends** (`src/backends/`) — a `Backend` implements `init / uploadField / step / draw / resize / dispose`. Two backends ship:
+4. **Backends** (`src/backends/`) — a `Backend` implements `init / uploadField / step / draw / resize / dispose`. Three backends ship:
    - **`canvas2d`** (P0, `src/backends/canvas2d/`): SoA spring simulation in `simulate.ts` and a `Uint32`/`ImageData` pixel-push renderer in `render.ts` with hoisted endianness detection.
    - **`webgl2`** (P1, `src/backends/webgl2/`): runs the particle simulation on the GPU via **transform feedback** and renders dots as **instanced quads**. Uses the shared pure planner `src/engine/reconcile-plan.ts` (`planReconcile` → `FieldDelta`) for readback-free reconcile→GPU sync (P0's `reconcile` was refactored onto the same planner). New unit-tested pure helpers: `src/engine/viewport.ts` (CSS-px→clip) and `src/engine/reconcile-plan.ts`. The GL pieces are playground-verified (no headless GL).
-   - **WebGPU** remains planned (P2).
+   - **`webgpu`** (P2, `src/backends/webgpu/`): runs the particle physics in a **WGSL compute shader** over storage buffers and renders dots as **instanced quads**. `@webgpu/types` is a devDependency. Playground-verified (no headless WebGPU).
 
-   `src/engine/select.ts` is **async** and picks the backend (`webgpu → webgl2 → canvas2d`), loading the WebGL2 backend via **dynamic `import()`** (code-split) and falling back to Canvas2D on any failure or unsupported context.
+   `src/engine/select.ts` is an **async cascade**: `resolveBackendOrder` (`src/engine/cascade.ts`) yields the ordered tier list (`webgpu → webgl2 → canvas2d`), then `selectBackend` construct-and-inits each tier in order — both GPU tiers are loaded via **dynamic `import()`** (code-split) — falling through to the next tier on any construct/init failure, with Canvas2D as the always-present safety net.
 
 ### Coordinate systems & DPR
 

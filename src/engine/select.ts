@@ -1,36 +1,54 @@
 import { createCanvas2DBackend } from '@/backends/canvas2d'
 import type { Backend, BackendKind } from '@/types'
-import { detectCapabilities, resolveBackendKind } from './backend'
+import { detectCapabilities } from './backend'
+import { type ConcreteBackend, resolveBackendOrder } from './cascade'
 
 export interface SelectOptions {
   requested: BackendKind
   dotSize: number
+  canvas: HTMLCanvasElement
+  dpr: number
+}
+
+async function construct(
+  kind: ConcreteBackend,
+  dotSize: number,
+): Promise<Backend> {
+  if (kind === 'webgpu') {
+    return (await import('@/backends/webgpu')).createWebGPUBackend({ dotSize })
+  }
+  if (kind === 'webgl2') {
+    return (await import('@/backends/webgl2')).createWebGL2Backend({ dotSize })
+  }
+  return createCanvas2DBackend({ dotSize })
 }
 
 /**
- * Resolves and constructs the best available backend, loading GPU backends via
- * dynamic import so they stay out of the core bundle. Any failure falls back to
- * Canvas2D (always present).
+ * Constructs and initializes the best available backend, trying tiers in order
+ * (GPU backends are dynamically imported / code-split) and falling through to
+ * the next on any construct/init failure. Canvas2D is the always-present last
+ * tier and is assumed not to throw.
  */
 export async function selectBackend(opts: SelectOptions): Promise<Backend> {
-  const kind = resolveBackendKind(opts.requested, detectCapabilities())
-  if (kind === 'webgl2') {
+  const order = resolveBackendOrder(opts.requested, detectCapabilities())
+  for (const kind of order) {
+    let be: Backend | undefined
     try {
-      const mod = await import('@/backends/webgl2')
-      return mod.createWebGL2Backend({ dotSize: opts.dotSize })
+      be = await construct(kind, opts.dotSize)
+      await be.init(opts.canvas, opts.dpr)
+      return be
     } catch (err) {
+      // Dispose any partially-initialized backend before trying the next tier.
+      be?.dispose()
       if (typeof console !== 'undefined') {
         console.info(
-          '[dotimation] webgl2 backend failed to load, using canvas2d',
+          `[dotimation] ${kind} backend unavailable, trying next`,
           err,
         )
       }
     }
   }
-  if (kind === 'webgpu' && typeof console !== 'undefined') {
-    console.info(
-      '[dotimation] webgpu backend not yet available, using canvas2d',
-    )
-  }
-  return createCanvas2DBackend({ dotSize: opts.dotSize })
+  const be = createCanvas2DBackend({ dotSize: opts.dotSize })
+  await be.init(opts.canvas, opts.dpr)
+  return be
 }

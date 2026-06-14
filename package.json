@@ -10,6 +10,7 @@
     "@biomejs/biome": "^2.5.0",
     "@types/bun": "^1.3.14",
     "@types/react": "^19.2.17",
+    "@webgpu/types": "^0.1.70",
     "bumpp": "^11.1.0",
     "bunup": "^0.16.32",
     "react": "^19.2.7",
