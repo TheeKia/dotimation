@@ -14,16 +14,16 @@ export function Toggle({
       aria-checked={checked}
       onClick={() => onChange(!checked)}
       className={clsx(
-        'relative h-5 w-9 rounded-full transition-colors',
+        'relative h-5 w-9 rounded-full p-0 transition-colors',
         checked ? 'bg-primary' : 'bg-input',
       )}
     >
       <span
         className={clsx(
-          'absolute top-0.5 size-4 rounded-full transition-transform',
+          'absolute left-0.5 top-0.5 size-4 rounded-full transition-transform',
           checked
             ? 'translate-x-4 bg-primary-foreground'
-            : 'translate-x-0.5 bg-muted-foreground',
+            : 'translate-x-0 bg-muted-foreground',
         )}
       />
     </button>
