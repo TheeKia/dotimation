@@ -8,18 +8,29 @@ export interface SelectOptions {
 }
 
 /**
- * Resolves and constructs the best available backend. In P0 only Canvas2D is
- * implemented; GPU tiers fall back to it. P1/P2 swap the fallback for dynamic
- * import of the WebGL2/WebGPU backends.
+ * Resolves and constructs the best available backend, loading GPU backends via
+ * dynamic import so they stay out of the core bundle. Any failure falls back to
+ * Canvas2D (always present).
  */
-export function selectBackend(opts: SelectOptions): Backend {
+export async function selectBackend(opts: SelectOptions): Promise<Backend> {
   const kind = resolveBackendKind(opts.requested, detectCapabilities())
-  if (kind !== 'canvas2d') {
-    if (typeof console !== 'undefined') {
-      console.info(
-        `[dotimation] ${kind} backend not yet available, using canvas2d`,
-      )
+  if (kind === 'webgl2') {
+    try {
+      const mod = await import('@/backends/webgl2')
+      return mod.createWebGL2Backend({ dotSize: opts.dotSize })
+    } catch (err) {
+      if (typeof console !== 'undefined') {
+        console.info(
+          '[dotimation] webgl2 backend failed to load, using canvas2d',
+          err,
+        )
+      }
     }
+  }
+  if (kind === 'webgpu' && typeof console !== 'undefined') {
+    console.info(
+      '[dotimation] webgpu backend not yet available, using canvas2d',
+    )
   }
   return createCanvas2DBackend({ dotSize: opts.dotSize })
 }
