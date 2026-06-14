@@ -44,15 +44,35 @@ export function planReconcile(
     }
   }
 
+  // Growth (newActive > prevActive). When the field still holds live particles,
+  // the new actives are taken from the in-flight faders sitting directly after
+  // the live range: growing `active` over them lets the retarget pass flip their
+  // targetAlpha back to 1, so a previous transition's leftover particles flow
+  // into the new layout instead of lingering — and being relocated forward — as
+  // a ghost of the old image. Only actives beyond every existing slot spawn
+  // fresh; faders past the new active range keep fading in place.
+  if (prevActive > 0) {
+    return {
+      active: newActive,
+      count: Math.max(prevCount, newActive),
+      overlap: prevActive,
+      relocate: null,
+      spawn:
+        newActive > prevCount ? { start: prevCount, end: newActive } : null,
+      firstLoad: false,
+    }
+  }
+
+  // Empty field (active 0, faders only): the live range is gone, so there is
+  // nothing to morph from. Seed the new actives fresh at home rather than
+  // dragging long-dead faders back from stale positions, and let the faders
+  // relocate out and finish fading.
   return {
     active: newActive,
     count: newActive + oldFaders,
-    overlap: prevActive,
-    relocate:
-      oldFaders > 0
-        ? { from: prevActive, to: newActive, len: oldFaders }
-        : null,
-    spawn: { start: prevActive, end: newActive },
+    overlap: 0,
+    relocate: oldFaders > 0 ? { from: 0, to: newActive, len: oldFaders } : null,
+    spawn: { start: 0, end: newActive },
     firstLoad: false,
   }
 }

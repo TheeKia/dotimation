@@ -198,7 +198,10 @@ export function createWebGL2Backend(opts: WebGL2Options): Backend {
         }
         b.read = (b.read ^ 1) as 0 | 1
       } else if (plan.spawn) {
-        // growth without faders: spawn region is beyond old count -> safe in place.
+        // Growth whose spawn region is beyond the old count -> safe to write in
+        // place. Any in-flight faders the growth absorbs are revived purely by
+        // the re-uploaded targets (targetAlpha flips to 1), so their state needs
+        // no touching here.
         gl.bindBuffer(gl.ARRAY_BUFFER, current)
         gl.bufferSubData(
           gl.ARRAY_BUFFER,
@@ -206,7 +209,9 @@ export function createWebGL2Backend(opts: WebGL2Options): Backend {
           packStateInto(stateScratch, field, plan.spawn.start, plan.spawn.end),
         )
       }
-      // shrink: nothing to do for state (targets already re-uploaded).
+      // Otherwise nothing to do for state — a shrink, or a growth fully covered
+      // by reviving faders. The re-uploaded targets carry the new homes and
+      // targetAlpha; the sim eases the existing state from there.
 
       active = plan.active
       count = plan.count
