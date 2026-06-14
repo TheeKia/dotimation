@@ -47,13 +47,13 @@ export function createBuffers(device: GPUDevice, capacity: number): GPUBuffers {
   }
 }
 
-/** Interleaved state [x,y,vx,vy,r,g,b,alpha] for slots [start,end). */
-export function packState(
+/** Writes interleaved state [x,y,vx,vy,r,g,b,alpha] for slots [start,end) into `out`; returns the used view. */
+export function packStateInto(
+  out: Float32Array,
   field: ParticleField,
   start: number,
   end: number,
 ): Float32Array {
-  const out = new Float32Array((end - start) * STATE_FLOATS)
   let o = 0
   for (let i = start; i < end; i++) {
     out[o++] = field.x[i]!
@@ -65,12 +65,15 @@ export function packState(
     out[o++] = field.b[i]!
     out[o++] = field.alpha[i]!
   }
-  return out
+  return out.subarray(0, o)
 }
 
-/** Interleaved targets for slots [0,count). */
-export function packTargets(field: ParticleField, count: number): Float32Array {
-  const out = new Float32Array(count * TARGET_FLOATS)
+/** Writes interleaved targets for slots [0,count) into `out`; returns the used view. */
+export function packTargetsInto(
+  out: Float32Array,
+  field: ParticleField,
+  count: number,
+): Float32Array {
   let o = 0
   for (let i = 0; i < count; i++) {
     out[o++] = field.homeX[i]!
@@ -80,7 +83,7 @@ export function packTargets(field: ParticleField, count: number): Float32Array {
     out[o++] = field.homeB[i]!
     out[o++] = field.targetAlpha[i]!
   }
-  return out
+  return out.subarray(0, o)
 }
 
 export function disposeBuffers(b: GPUBuffers): void {

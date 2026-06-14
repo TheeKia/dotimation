@@ -5,15 +5,19 @@ import {
   SETTLE_TIME,
   ZETA,
 } from '@/engine/constants'
-import { planReconcile, STATE_FLOATS } from '@/engine/reconcile-plan'
+import {
+  planReconcile,
+  STATE_FLOATS,
+  TARGET_FLOATS,
+} from '@/engine/reconcile-plan'
 import { tuneSpring } from '@/engine/settle'
 import type { Backend, ParticleField } from '@/types'
 import {
   createBuffers,
   disposeBuffers,
   type GPUBuffers,
-  packState,
-  packTargets,
+  packStateInto,
+  packTargetsInto,
 } from './buffers'
 import { acquireGPU } from './device'
 import { createPipelines, type Pipelines } from './pipelines'
@@ -37,6 +41,8 @@ export function createWebGPUBackend(opts: WebGPUOptions): Backend {
   let lost = false
   let lastUpload = 0
   let dotSize = opts.dotSize
+  let stateScratch = new Float32Array(1024 * STATE_FLOATS)
+  let targetScratch = new Float32Array(1024 * TARGET_FLOATS)
   const { k, c } = tuneSpring({ settleTime: SETTLE_TIME, zeta: ZETA })
   const FADE_DURATION_MS = (1 / OPACITY_RATE + 0.15) * 1000
 
@@ -81,6 +87,12 @@ export function createWebGPUBackend(opts: WebGPUOptions): Backend {
     buffers = next
     // The cached bind groups referenced the disposed buffers; rebuild them.
     rebuildBindGroups()
+    if (stateScratch.length < next.capacity * STATE_FLOATS) {
+      stateScratch = new Float32Array(next.capacity * STATE_FLOATS)
+    }
+    if (targetScratch.length < next.capacity * TARGET_FLOATS) {
+      targetScratch = new Float32Array(next.capacity * TARGET_FLOATS)
+    }
   }
 
   return {
@@ -106,10 +118,18 @@ export function createWebGPUBackend(opts: WebGPUOptions): Backend {
       const current = b.state[b.read]!
       const other = b.state[b.read ^ 1]!
 
-      device.queue.writeBuffer(b.targets, 0, packTargets(field, field.count))
+      device.queue.writeBuffer(
+        b.targets,
+        0,
+        packTargetsInto(targetScratch, field, field.count),
+      )
 
       if (plan.firstLoad) {
-        device.queue.writeBuffer(current, 0, packState(field, 0, field.count))
+        device.queue.writeBuffer(
+          current,
+          0,
+          packStateInto(stateScratch, field, 0, field.count),
+        )
       } else if (plan.relocate) {
         const enc = device.createCommandEncoder()
         enc.copyBufferToBuffer(
@@ -131,7 +151,12 @@ export function createWebGPUBackend(opts: WebGPUOptions): Backend {
           device.queue.writeBuffer(
             other,
             plan.spawn.start * STATE_STRIDE_BYTES,
-            packState(field, plan.spawn.start, plan.spawn.end),
+            packStateInto(
+              stateScratch,
+              field,
+              plan.spawn.start,
+              plan.spawn.end,
+            ),
           )
         }
         b.read = (b.read ^ 1) as 0 | 1
@@ -139,7 +164,7 @@ export function createWebGPUBackend(opts: WebGPUOptions): Backend {
         device.queue.writeBuffer(
           current,
           plan.spawn.start * STATE_STRIDE_BYTES,
-          packState(field, plan.spawn.start, plan.spawn.end),
+          packStateInto(stateScratch, field, plan.spawn.start, plan.spawn.end),
         )
       }
 

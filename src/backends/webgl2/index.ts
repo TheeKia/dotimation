@@ -5,15 +5,19 @@ import {
   SETTLE_TIME,
   ZETA,
 } from '@/engine/constants'
-import { planReconcile, STATE_FLOATS } from '@/engine/reconcile-plan'
+import {
+  planReconcile,
+  STATE_FLOATS,
+  TARGET_FLOATS,
+} from '@/engine/reconcile-plan'
 import { tuneSpring } from '@/engine/settle'
 import type { Backend, ParticleField } from '@/types'
 import {
   createBuffers,
   disposeBuffers,
   type GLBuffers,
-  packState,
-  packTargets,
+  packStateInto,
+  packTargetsInto,
 } from './buffers'
 import { getGL } from './gl'
 import { createDrawProgram, type DrawProgram } from './program-draw'
@@ -40,6 +44,8 @@ export function createWebGL2Backend(opts: WebGL2Options): Backend {
   let lastUpload = 0
   let dotSize = opts.dotSize
   let lastField: ParticleField | null = null
+  let stateScratch = new Float32Array(1024 * STATE_FLOATS)
+  let targetScratch = new Float32Array(1024 * TARGET_FLOATS)
   const { k, c } = tuneSpring({ settleTime: SETTLE_TIME, zeta: ZETA })
   // Faders fade out at OPACITY_RATE; after this long they are invisible and the
   // tail can be dropped. The Canvas2D backend compacts faders in stepField; the
@@ -105,6 +111,12 @@ export function createWebGL2Backend(opts: WebGL2Options): Backend {
     // The old VAOs referenced the disposed buffers; rebind them to the new ones.
     sim?.setBuffers(next.state[0], next.state[1], next.targets)
     draw?.setBuffers(next.state[0], next.state[1], next.quad)
+    if (stateScratch.length < next.capacity * STATE_FLOATS) {
+      stateScratch = new Float32Array(next.capacity * STATE_FLOATS)
+    }
+    if (targetScratch.length < next.capacity * TARGET_FLOATS) {
+      targetScratch = new Float32Array(next.capacity * TARGET_FLOATS)
+    }
   }
 
   function init(canvas: HTMLCanvasElement, devicePixelRatio: number): void {
@@ -135,11 +147,19 @@ export function createWebGL2Backend(opts: WebGL2Options): Backend {
 
       // targets buffer: always full re-upload from the reconciled field.
       gl.bindBuffer(gl.ARRAY_BUFFER, b.targets)
-      gl.bufferSubData(gl.ARRAY_BUFFER, 0, packTargets(field, field.count))
+      gl.bufferSubData(
+        gl.ARRAY_BUFFER,
+        0,
+        packTargetsInto(targetScratch, field, field.count),
+      )
 
       if (plan.firstLoad) {
         gl.bindBuffer(gl.ARRAY_BUFFER, current)
-        gl.bufferSubData(gl.ARRAY_BUFFER, 0, packState(field, 0, field.count))
+        gl.bufferSubData(
+          gl.ARRAY_BUFFER,
+          0,
+          packStateInto(stateScratch, field, 0, field.count),
+        )
       } else if (plan.relocate) {
         // Overlap clobber-safe rebuild into the OTHER buffer, then swap.
         gl.bindBuffer(gl.COPY_READ_BUFFER, current)
@@ -166,7 +186,12 @@ export function createWebGL2Backend(opts: WebGL2Options): Backend {
           gl.bufferSubData(
             gl.ARRAY_BUFFER,
             plan.spawn.start * STATE_STRIDE_BYTES,
-            packState(field, plan.spawn.start, plan.spawn.end),
+            packStateInto(
+              stateScratch,
+              field,
+              plan.spawn.start,
+              plan.spawn.end,
+            ),
           )
         }
         b.read = (b.read ^ 1) as 0 | 1
@@ -176,7 +201,7 @@ export function createWebGL2Backend(opts: WebGL2Options): Backend {
         gl.bufferSubData(
           gl.ARRAY_BUFFER,
           plan.spawn.start * STATE_STRIDE_BYTES,
-          packState(field, plan.spawn.start, plan.spawn.end),
+          packStateInto(stateScratch, field, plan.spawn.start, plan.spawn.end),
         )
       }
       // shrink: nothing to do for state (targets already re-uploaded).
