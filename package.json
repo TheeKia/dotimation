@@ -50,7 +50,7 @@
     "build": "bun scripts/build-worker.ts && bunup --env.NODE_ENV='production' --minify --no-sourcemap --footer '// built with love'",
     "build:worker": "bun scripts/build-worker.ts",
     "dev": "bun scripts/build-worker.ts && bun run --cwd test/ui dev",
-    "postinstall": "bun simple-git-hooks && bun scripts/build-worker.ts",
+    "prepare": "bun simple-git-hooks && bun scripts/build-worker.ts",
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
     "release": "bumpp --commit --push --tag",
