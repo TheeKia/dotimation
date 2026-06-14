@@ -10,10 +10,8 @@ bun add dotimation
 
 ## Usage
 
-Dotimation makes use of react-query so make sure this is used inside a QueryClientProvider
-
 ```tsx
-import { Dotimation } from 'dotimation';
+import { Dotimation } from 'dotimation'
 
 function Component() {
   return (
@@ -21,10 +19,26 @@ function Component() {
       item={{ type: 'text', data: 'Hello' }}
       width={256}
       height={256}
+      backend="auto"   // 'auto' | 'webgpu' | 'webgl2' | 'canvas2d'
+      idle="sleep"     // stop animating once particles settle
     />
-  );
+  )
 }
 ```
+
+### Props
+
+| Prop | Required | Default | Description |
+|------|----------|---------|-------------|
+| `item` | yes | — | `AnimateItem` — `{ type: 'text', data, fontSize?, fontFamily?, textColor? }` or `{ type: 'image', data, invert?, maxWidth?, maxHeight? }` |
+| `width` | yes | — | Canvas width in CSS pixels |
+| `height` | yes | — | Canvas height in CSS pixels |
+| `defaultFontFamily` | no | `'sans-serif'` | Fallback font when `item.fontFamily` is not set |
+| `alpha` | no | `128` | Minimum pixel alpha (0–255) for a pixel to become a dot |
+| `pointSpacingCss` | no | `2` | Grid spacing (CSS px) between sampled dots — larger = fewer dots |
+| `dotSize` | no | `1` | Radius multiplier for rendered dots |
+| `backend` | no | `'auto'` | Rendering backend: `'auto' \| 'webgpu' \| 'webgl2' \| 'canvas2d'` |
+| `idle` | no | `'sleep'` | `'sleep'` stops the rAF loop once particles settle; `'animate'` keeps looping |
 
 ## Contributing
 

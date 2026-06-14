@@ -24,19 +24,19 @@ A `simple-git-hooks` pre-commit hook runs `lint` + `type-check`. CI (`ci.yml`) r
 
 ## Architecture: the particle pipeline
 
-The whole library is one data flow from source content to animated pixels. Understanding these stages (and the two coordinate systems / two buffers) is the key to working here.
+The library is one data flow from source content to animated pixels. There is a strict **pure-core / DOM-shell split**: pure logic (field, sampler, simulate, render, settle, clock) is unit-tested under `bun test`; DOM/React-bound shells (rasterize, engine, backend, component) are exercised in the `test/ui` playground.
 
-1. **Rasterize → sample particles** — `initParticles` in `src/utils/utils.ts` (async). Draws the `AnimateItem` (text or image) onto an offscreen canvas, then walks the pixel buffer on a grid (`pointSpacingCss` step) and emits a `Particle` for every pixel whose alpha exceeds `alpha`. Each particle stores its `home*` target position/color. The array is Fisher–Yates shuffled so morph transitions look organic. Text auto-sizing lives in `src/utils/font.ts` (`AUTO` = glyph-weighted heuristic, `AUTO_MONO` = monospace blend).
+1. **Rasterize** (`src/raster/`) — `rasterize()` (DOM shell) draws the `AnimateItem` (text or image) onto an offscreen canvas and calls the pure `sampleTargets()` (`src/raster/sample.ts`) to walk the pixel buffer on a grid (`pointSpacingCss` step) and produce `FieldTargets` — a Structure-of-Arrays (SoA) of home positions and colors for every sampled pixel. Text auto-sizing lives in `src/utils/font.ts` (`AUTO` = glyph-weighted heuristic, `AUTO_MONO` = monospace blend). The `useFieldTargets` hook (`src/hooks/use-field-targets.ts`) re-rasterizes when `item` (shallow-compared) or `width`/`height` change; an `executionId` ref discards stale async results.
 
-2. **Recompute on change** — `useInitialParticles` (`src/hooks/use-initial-particles.ts`) reruns `initParticles` only when `item` (shallow-compared) or `width`/`height` change. An `executionId` ref guards against stale async results landing out of order.
+2. **Field model** (`src/engine/field.ts`) — one `ParticleField` of typed Float32Arrays (Structure-of-Arrays). `reconcile(field, targets)` maps the old layout onto new targets in a single fixed-capacity buffer: slots `[0, active)` are the live layout, slots `[active, count)` are faders leaving (per-particle `targetAlpha = 0`). The buffer grows via `growField` (rounds up to next power-of-2) only when needed. This replaces the old two-buffer reconcile approach.
 
-3. **Reconcile old → new layout** — `reconcileParticles` and friends in `src/components/dotimation.tsx`. The component keeps two live buffers in refs: `particlesRef` (the active dots) and `intermediateRef` (surplus dots fading out). When the new target is larger it clones extra particles seeded from existing ones (fly-in); when smaller it moves the overflow into the intermediate buffer (fade-out). All mutations are in place so the running animation loop never restarts.
+3. **Orchestrator** (`src/engine/engine.ts`) — owns the rAF loop, a fixed-timestep accumulator (`src/engine/clock.ts`, 90 Hz physics), deterministic settle/sleep (`src/engine/settle.ts` — stops the loop ~1.5 s after the last change, so idle CPU cost is ~0%), and an `IntersectionObserver` for visibility gating. Exposes `setField` / `resize` / `dispose` and drives a `Backend` interface.
 
-4. **Animate** — `animateParticles` in `src/animations/fps.ts`. A fixed-timestep loop (90 Hz physics via an accumulator, capped at `maxStepsPerFrame`) integrates a critically-damped spring pulling each particle toward its `home` position, plus color lerp, opacity fade, and small jitter. Rendering bypasses canvas draw calls: it writes packed RGBA directly into an `ImageData` `Uint32Array` view with manual alpha compositing, then `putImageData`. Driven by `requestAnimationFrame`; an `AbortController` (from the component's effect) stops the loop on unmount/change.
+4. **Backends** (`src/backends/`) — a `Backend` implements `init / uploadField / step / draw / resize / dispose`. P0 ships `canvas2d` (`src/backends/canvas2d/`): SoA spring simulation in `simulate.ts` and a `Uint32`/`ImageData` pixel-push renderer in `render.ts` with hoisted endianness detection. `src/engine/select.ts` picks the backend (`webgpu → webgl2 → canvas2d`); GPU tiers are planned (P1/P2) and currently fall back to `canvas2d`.
 
 ### Coordinate systems & DPR
 
-Everything tracks two coordinate spaces. Particle positions are in **CSS pixels**; the canvas backing store is **device pixels** (`width * dpr`). `dpr` is `min(devicePixelRatio, 2)` and must be computed the same way everywhere it appears (`getCtx`, `initParticles`, the render loop). `getCtx` sets the canvas size and an initial transform; the animation render loop converts CSS→device per pixel.
+Particle positions are in **CSS pixels**; the canvas backing store is **device pixels** (`width * dpr`). `dpr` is `min(devicePixelRatio, 2)` and is computed consistently in `getCtx` (`src/utils/utils.ts`) and `rasterize`. The engine passes `dpr` to the backend at `init`; the backend handles device-pixel conversion internally.
 
 ## Conventions & gotchas
 
@@ -44,5 +44,4 @@ Everything tracks two coordinate spaces. Particle positions are in **CSS pixels*
 - **`noUncheckedIndexedAccess: true`** — array/object index access is `T | undefined`. The `!` non-null assertions throughout (`arr[i]!`) are deliberate and Biome's `noNonNullAssertion` is turned off to allow them.
 - **Path alias `@/*` → `src/*`** exists but is used inconsistently (`index.tsx` uses `@/...`, most files use relative imports). Match the file you're editing.
 - **Formatting** is Biome-owned: single quotes, no semicolons (`asNeeded`), 2-space indent. Note `.editorconfig` says tabs but Biome's `indentStyle: space` wins for code; let `bun run lint:fix` format.
-- **`README.md` is stale**: it claims Dotimation "makes use of react-query" and needs a `QueryClientProvider`. It does not — there is no react-query dependency anywhere. Ignore that note.
-- **`test/index.test.ts` is a placeholder** (`true === true`). There is no real unit-test coverage of the particle/animation code yet; the canvas-heavy logic is exercised manually through the `test/ui` playground.
+- **Unit tests** live under `bun test` and cover the pure cores (field, sampler, simulate, render, settle, clock). DOM/React-bound code (rasterize, engine, backends, component) is exercised manually through the `test/ui` playground.
