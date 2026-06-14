@@ -1,7 +1,5 @@
-import { COLOR_RATE, OPACITY_RATE } from '@/engine/constants'
+import { COLOR_RATE, JITTER_AMOUNT, OPACITY_RATE } from '@/engine/constants'
 import type { ParticleField } from '@/types'
-
-const JITTER_AMOUNT = 1
 
 function expLerp(
   current: number,

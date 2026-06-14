@@ -16,3 +16,7 @@ export const ZETA = 1
 export const OPACITY_RATE = 2
 /** Per-second color ease rate toward home color. */
 export const COLOR_RATE = 2
+/** Per-jitter horizontal nudge (px) applied to X for the shimmer effect. */
+export const JITTER_AMOUNT = 1
+/** Jitter frequency (Hz) — how often the horizontal shimmer nudge fires. */
+export const JITTER_HZ = 30
