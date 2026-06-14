@@ -12,6 +12,7 @@ export function sampleTargets(
   pointSpacingCss: number,
   alpha: number,
   rand: () => number = Math.random,
+  maxParticles: number = Number.POSITIVE_INFINITY,
 ): FieldTargets {
   const step = Math.max(1, Math.round(pointSpacingCss * dpr))
   const xs: number[] = []
@@ -43,15 +44,16 @@ export function sampleTargets(
     order[j] = tmp
   }
 
+  const keep = Math.min(n, Math.max(0, Math.floor(maxParticles)))
   const t: FieldTargets = {
-    count: n,
-    homeX: new Float32Array(n),
-    homeY: new Float32Array(n),
-    homeR: new Float32Array(n),
-    homeG: new Float32Array(n),
-    homeB: new Float32Array(n),
+    count: keep,
+    homeX: new Float32Array(keep),
+    homeY: new Float32Array(keep),
+    homeR: new Float32Array(keep),
+    homeG: new Float32Array(keep),
+    homeB: new Float32Array(keep),
   }
-  for (let i = 0; i < n; i++) {
+  for (let i = 0; i < keep; i++) {
     const k = order[i]!
     t.homeX[i] = xs[k]!
     t.homeY[i] = ys[k]!

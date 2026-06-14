@@ -55,6 +55,11 @@ export interface ParticleField {
   targetAlpha: Float32Array
 }
 
+export interface DotimationStats {
+  backend: 'webgpu' | 'webgl2' | 'canvas2d'
+  particles: number
+}
+
 export interface Backend {
   init(canvas: HTMLCanvasElement, dpr: number): Promise<void> | void
   uploadField(field: ParticleField): void

@@ -1,5 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { rasterize } from '@/raster/rasterize'
+import {
+  rasterizeViaWorker,
+  workerRasterAvailable,
+} from '@/raster/rasterize-worker'
+import { isWorkerSafe } from '@/raster/worker-safe'
 import type { AnimateItem, FieldTargets } from '@/types'
 
 function shallowEqual<T extends object>(a: T, b: T): boolean {
@@ -16,6 +21,7 @@ export function useFieldTargets(
   defaultFontFamily: string,
   alpha: number,
   pointSpacingCss: number,
+  maxParticles: number,
 ): FieldTargets | null {
   const [targets, setTargets] = useState<FieldTargets | null>(null)
   const prevItem = useRef<AnimateItem | null>(null)
@@ -32,17 +38,51 @@ export function useFieldTargets(
     prevItem.current = item
     prevSize.current = { width, height }
     const id = ++executionId.current
-    rasterize(
-      width,
-      height,
-      item,
-      defaultFontFamily,
-      alpha,
-      pointSpacingCss,
-    ).then((t) => {
+    const dpr = Math.min(window.devicePixelRatio || 1, 2)
+    const useWorker =
+      workerRasterAvailable() && isWorkerSafe(item, defaultFontFamily)
+    const task = useWorker
+      ? rasterizeViaWorker(
+          width,
+          height,
+          item,
+          defaultFontFamily,
+          alpha,
+          pointSpacingCss,
+          maxParticles,
+          dpr,
+        ).catch(() =>
+          rasterize(
+            width,
+            height,
+            item,
+            defaultFontFamily,
+            alpha,
+            pointSpacingCss,
+            maxParticles,
+          ),
+        )
+      : rasterize(
+          width,
+          height,
+          item,
+          defaultFontFamily,
+          alpha,
+          pointSpacingCss,
+          maxParticles,
+        )
+    task.then((t) => {
       if (id === executionId.current) setTargets(t)
     })
-  }, [width, height, item, defaultFontFamily, alpha, pointSpacingCss])
+  }, [
+    width,
+    height,
+    item,
+    defaultFontFamily,
+    alpha,
+    pointSpacingCss,
+    maxParticles,
+  ])
 
   return targets
 }

@@ -14,7 +14,7 @@ Bun is the only supported toolchain (`bun.lock`, `bunfig.toml`). Do not use npm/
 
 - `bun install` — install deps
 - `bun run dev` — start the Vite playground (`test/ui`) that imports the library **directly from `src/`** (see its `vite.config.ts` alias); no build needed to see changes
-- `bun run build` — bundle to `dist/` via `bunup` (minified, no sourcemaps; config is all CLI flags, no `bunup.config.ts`)
+- `bun run build` — runs `scripts/build-worker.ts` first (generates the inlined worker source at `src/raster/worker-source.ts`), then bundles to `dist/` via `bunup` (minified, no sourcemaps; config is all CLI flags, no `bunup.config.ts`)
 - `bun run type-check` — `tsc --noEmit`
 - `bun run lint` / `bun run lint:fix` — Biome check / autofix
 - `bun test` — run tests; `bun test path/to/file.test.ts` for a single file; `bun test -t "name"` for a single test; `bun run test:watch`, `bun run test:coverage`
@@ -26,7 +26,9 @@ A `simple-git-hooks` pre-commit hook runs `lint` + `type-check`. CI (`ci.yml`) r
 
 The library is one data flow from source content to animated pixels. There is a strict **pure-core / DOM-shell split**: pure logic (field, sampler, simulate, render, settle, clock) is unit-tested under `bun test`; DOM/React-bound shells (rasterize, engine, backend, component) are exercised in the `test/ui` playground.
 
-1. **Rasterize** (`src/raster/`) — `rasterize()` (DOM shell) draws the `AnimateItem` (text or image) onto an offscreen canvas and calls the pure `sampleTargets()` (`src/raster/sample.ts`) to walk the pixel buffer on a grid (`pointSpacingCss` step) and produce `FieldTargets` — a Structure-of-Arrays (SoA) of home positions and colors for every sampled pixel. Text auto-sizing lives in `src/utils/font.ts` (`AUTO` = glyph-weighted heuristic, `AUTO_MONO` = monospace blend). The `useFieldTargets` hook (`src/hooks/use-field-targets.ts`) re-rasterizes when `item` (shallow-compared) or `width`/`height` change; an `executionId` ref discards stale async results.
+1. **Rasterize** (`src/raster/`) — Rasterization runs in a **Web Worker** when safe: `src/raster/raster.worker.ts` (uses `OffscreenCanvas`) is bundled to a self-contained string by `scripts/build-worker.ts` → gitignored `src/raster/worker-source.ts` (regenerated on `bun install` / `bun run build` / `bun run dev`), and instantiated via a Blob URL in `src/raster/rasterize-worker.ts` — so it ships inlined and runs for any consumer regardless of bundler. The pure `isWorkerSafe` (`src/raster/worker-safe.ts`) keeps custom-font text on the main thread (workers have a separate font set); a main-thread `rasterize` fallback covers every failure. Shared draw/scale helpers live in `src/raster/draw.ts`.
+
+   `rasterize()` (DOM shell) draws the `AnimateItem` (text or image) onto an offscreen canvas and calls the pure `sampleTargets()` (`src/raster/sample.ts`) to walk the pixel buffer on a grid (`pointSpacingCss` step) and produce `FieldTargets` — a Structure-of-Arrays (SoA) of home positions and colors for every sampled pixel. Text auto-sizing lives in `src/utils/font.ts` (`AUTO` = glyph-weighted heuristic, `AUTO_MONO` = monospace blend). The `useFieldTargets` hook (`src/hooks/use-field-targets.ts`) re-rasterizes when `item` (shallow-compared) or `width`/`height` change; an `executionId` ref discards stale async results.
 
 2. **Field model** (`src/engine/field.ts`) — one `ParticleField` of typed Float32Arrays (Structure-of-Arrays). `reconcile(field, targets)` maps the old layout onto new targets in a single fixed-capacity buffer: slots `[0, active)` are the live layout, slots `[active, count)` are faders leaving (per-particle `targetAlpha = 0`). The buffer grows via `growField` (rounds up to next power-of-2) only when needed. This replaces the old two-buffer reconcile approach.
 
@@ -38,6 +40,13 @@ The library is one data flow from source content to animated pixels. There is a 
    - **`webgpu`** (P2, `src/backends/webgpu/`): runs the particle physics in a **WGSL compute shader** over storage buffers and renders dots as **instanced quads**. `@webgpu/types` is a devDependency. Playground-verified (no headless WebGPU).
 
    `src/engine/select.ts` is an **async cascade**: `resolveBackendOrder` (`src/engine/cascade.ts`) yields the ordered tier list (`webgpu → webgl2 → canvas2d`), then `selectBackend` construct-and-inits each tier in order — both GPU tiers are loaded via **dynamic `import()`** (code-split) — falling through to the next tier on any construct/init failure, with Canvas2D as the always-present safety net.
+
+   **Cross-tier render parity:** all three backends use premultiplied source-over blending and snap dots to the device-pixel grid, so they render alike regardless of which tier is active.
+
+### New props (P3)
+
+- **`maxParticles?: number`** — caps the total particle count via a uniform random subset after sampling; trades fidelity for performance.
+- **`onStats?: (stats: { backend: 'webgpu' | 'webgl2' | 'canvas2d'; particles: number }) => void`** — fires on engine creation and each field update; exposes the resolved backend (useful to see which tier `'auto'` chose) and the live particle count.
 
 ### Coordinate systems & DPR
 

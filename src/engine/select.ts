@@ -29,14 +29,16 @@ async function construct(
  * the next on any construct/init failure. Canvas2D is the always-present last
  * tier and is assumed not to throw.
  */
-export async function selectBackend(opts: SelectOptions): Promise<Backend> {
+export async function selectBackend(
+  opts: SelectOptions,
+): Promise<{ backend: Backend; kind: ConcreteBackend }> {
   const order = resolveBackendOrder(opts.requested, detectCapabilities())
   for (const kind of order) {
     let be: Backend | undefined
     try {
       be = await construct(kind, opts.dotSize)
       await be.init(opts.canvas, opts.dpr)
-      return be
+      return { backend: be, kind }
     } catch (err) {
       // Dispose any partially-initialized backend before trying the next tier.
       be?.dispose()
@@ -50,5 +52,5 @@ export async function selectBackend(opts: SelectOptions): Promise<Backend> {
   }
   const be = createCanvas2DBackend({ dotSize: opts.dotSize })
   await be.init(opts.canvas, opts.dpr)
-  return be
+  return { backend: be, kind: 'canvas2d' }
 }

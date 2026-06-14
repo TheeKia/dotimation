@@ -37,3 +37,28 @@ describe('sampleTargets', () => {
     expect(t.homeY[0]).toBe(1)
   })
 })
+
+describe('sampleTargets maxParticles', () => {
+  // 4x4 fully-opaque image → 16 candidate pixels at step 1.
+  function opaque(): Uint8ClampedArray {
+    const p = new Uint8ClampedArray(4 * 4 * 4)
+    for (let i = 0; i < 16; i++) p[i * 4 + 3] = 255
+    return p
+  }
+
+  test('caps the count to maxParticles', () => {
+    const t = sampleTargets(opaque(), 4, 4, 1, 1, 128, () => 0, 5)
+    expect(t.count).toBe(5)
+    expect(t.homeX.length).toBe(5)
+  })
+
+  test('keeps all when cap exceeds the sample', () => {
+    const t = sampleTargets(opaque(), 4, 4, 1, 1, 128, () => 0, 100)
+    expect(t.count).toBe(16)
+  })
+
+  test('unbounded by default', () => {
+    const t = sampleTargets(opaque(), 4, 4, 1, 1, 128, () => 0)
+    expect(t.count).toBe(16)
+  })
+})

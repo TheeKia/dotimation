@@ -5,6 +5,8 @@ import { type AnimateItem, type BackendKind, Dotimation } from 'dotimation'
 import { useEffect, useRef, useState } from 'react'
 import { useScreen } from './hooks/use-screen'
 
+type DotimationStats = { backend: string; particles: number }
+
 const TEST_ITEMS: { label: string; item: AnimateItem }[] = [
   {
     label: 'Auto Size',
@@ -91,6 +93,10 @@ export function App() {
   const [backend, setBackend] = useState<BackendKind>('auto')
   const [dotSize, setDotSize] = useState(1)
   const [idle, setIdle] = useState<'sleep' | 'animate'>('animate')
+  const [stats, setStats] = useState<DotimationStats | null>(null)
+  const [maxParticles, setMaxParticles] = useState<number | undefined>(
+    undefined,
+  )
   const screen = useScreen()
   const fps = useFps()
 
@@ -98,6 +104,7 @@ export function App() {
     <main className="flex size-screen pt-3">
       <div className="fixed top-2 left-2 text-xs font-mono opacity-70">
         {fps} fps · {backend} · dot {dotSize} · {idle}
+        {stats ? ` · ${stats.backend} · ${stats.particles} dots` : ''}
       </div>
       <Dotimation
         item={item}
@@ -106,6 +113,8 @@ export function App() {
         backend={backend}
         dotSize={dotSize}
         idle={idle}
+        onStats={setStats}
+        maxParticles={maxParticles}
       />
       <div className="fixed bottom-2 inset-x-0 w-full flex flex-wrap items-center justify-center gap-1">
         {TEST_ITEMS.map(({ label, item: data }) => (
@@ -151,6 +160,17 @@ export function App() {
           className="cursor-pointer hover:bg-primary/10 px-2 h-7 rounded-md text-xs"
         >
           idle: {idle}
+        </button>
+        <button
+          type="button"
+          onClick={() =>
+            setMaxParticles((v) =>
+              v === undefined ? 5000 : v === 5000 ? 20000 : undefined,
+            )
+          }
+          className="cursor-pointer hover:bg-primary/10 px-2 h-7 rounded-md text-xs"
+        >
+          max: {maxParticles ?? '∞'}
         </button>
       </div>
     </main>

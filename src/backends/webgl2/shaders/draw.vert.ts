@@ -16,7 +16,7 @@ out float vAlpha;
 
 void main() {
   // device-px position of this corner of the dot
-  vec2 dev = aInstancePos * uDpr + (aCorner - 0.5) * uDotSize + uDotSize * 0.5;
+  vec2 dev = floor(aInstancePos * uDpr + 0.5) + aCorner * uDotSize;
   // device px -> clip space (Y flipped)
   vec2 clip = vec2(dev.x / uDevW * 2.0 - 1.0, 1.0 - dev.y / uDevH * 2.0);
   gl_Position = vec4(clip, 0.0, 1.0);

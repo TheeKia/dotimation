@@ -39,6 +39,8 @@ function Component() {
 | `dotSize` | no | `1` | Radius multiplier for rendered dots |
 | `backend` | no | `'auto'` | Rendering backend: `'auto' \| 'webgpu' \| 'webgl2' \| 'canvas2d'` |
 | `idle` | no | `'sleep'` | `'sleep'` stops the rAF loop once particles settle; `'animate'` keeps looping |
+| `maxParticles` | no | — | Cap the total number of dots (uniform random subset); trades fidelity for performance |
+| `onStats` | no | — | `(stats: { backend: 'webgpu' \| 'webgl2' \| 'canvas2d'; particles: number }) => void` — fires on engine creation and each field update; reveals which backend `'auto'` resolved to and the live particle count |
 
 ## Contributing
 

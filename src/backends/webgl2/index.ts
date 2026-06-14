@@ -92,7 +92,12 @@ export function createWebGL2Backend(opts: WebGL2Options): Backend {
     draw = createDrawProgram(gl)
     gl.disable(gl.DEPTH_TEST)
     gl.enable(gl.BLEND)
-    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA)
+    gl.blendFuncSeparate(
+      gl.SRC_ALPHA,
+      gl.ONE_MINUS_SRC_ALPHA,
+      gl.ONE,
+      gl.ONE_MINUS_SRC_ALPHA,
+    )
     gl.viewport(0, 0, devW, devH)
   }
 

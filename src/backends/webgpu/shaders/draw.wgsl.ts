@@ -15,7 +15,7 @@ fn vs(
   @location(2) instColor: vec3<f32>,
   @location(3) instAlpha: f32,
 ) -> VOut {
-  let dev = instPos * R.dpr + (corner - vec2<f32>(0.5, 0.5)) * R.dotSize + vec2<f32>(R.dotSize * 0.5, R.dotSize * 0.5);
+  let dev = floor(instPos * R.dpr + vec2<f32>(0.5, 0.5)) + corner * R.dotSize;
   let clip = vec2<f32>(dev.x / R.devW * 2.0 - 1.0, 1.0 - dev.y / R.devH * 2.0);
   var o: VOut;
   o.pos = vec4<f32>(clip, 0.0, 1.0);

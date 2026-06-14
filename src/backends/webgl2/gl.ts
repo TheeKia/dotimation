@@ -2,7 +2,7 @@ export function getGL(
   canvas: HTMLCanvasElement,
 ): WebGL2RenderingContext | null {
   return canvas.getContext('webgl2', {
-    premultipliedAlpha: false,
+    premultipliedAlpha: true,
     alpha: true,
     antialias: false,
   })

@@ -8,6 +8,7 @@ import { useFieldTargets } from '@/hooks/use-field-targets'
 import type {
   AnimateItem,
   BackendKind,
+  DotimationStats,
   FieldTargets,
   IdleBehavior,
   ParticleField,
@@ -33,6 +34,9 @@ type DotimationProps = {
   backend?: BackendKind
   /** @default 'sleep' */
   idle?: IdleBehavior
+  /** @default unbounded */
+  maxParticles?: number
+  onStats?: (stats: DotimationStats) => void
 }
 
 export default function Dotimation({
@@ -48,11 +52,16 @@ export default function Dotimation({
   dotSize = 1,
   backend = 'auto',
   idle = 'sleep',
+  maxParticles = Number.POSITIVE_INFINITY,
+  onStats,
 }: DotimationProps): React.ReactNode {
   const ref = useRef<HTMLCanvasElement>(null)
   const engineRef = useRef<Engine | null>(null)
   const fieldRef = useRef<ParticleField>(createField(1024))
   const targetsRef = useRef<FieldTargets | null>(null)
+  const kindRef = useRef<DotimationStats['backend']>('canvas2d')
+  const onStatsRef = useRef(onStats)
+  onStatsRef.current = onStats
 
   useImperativeHandle(canvasRef, () => ref.current!)
 
@@ -63,6 +72,7 @@ export default function Dotimation({
     defaultFontFamily,
     alpha,
     pointSpacingCss,
+    maxParticles,
   )
 
   // Create / recreate the engine when canvas geometry or backend config changes.
@@ -75,7 +85,7 @@ export default function Dotimation({
     const dpr = sizeCanvas(canvas, width, height)
 
     void (async () => {
-      const be = await selectBackend({
+      const { backend: be, kind } = await selectBackend({
         requested: backend,
         dotSize,
         canvas,
@@ -85,6 +95,7 @@ export default function Dotimation({
         be.dispose()
         return
       }
+      kindRef.current = kind
       engine = createEngine({ backend: be, canvas, dpr, idle })
       engineRef.current = engine
       fieldRef.current = createField(1024)
@@ -92,6 +103,10 @@ export default function Dotimation({
         fieldRef.current = reconcile(fieldRef.current, targetsRef.current)
         engine.setField(fieldRef.current)
       }
+      onStatsRef.current?.({
+        backend: kind,
+        particles: fieldRef.current.active,
+      })
     })()
 
     return () => {
@@ -107,6 +122,10 @@ export default function Dotimation({
     if (!targets || !engineRef.current) return
     fieldRef.current = reconcile(fieldRef.current, targets)
     engineRef.current.setField(fieldRef.current)
+    onStatsRef.current?.({
+      backend: kindRef.current,
+      particles: fieldRef.current.active,
+    })
   }, [targets])
 
   return (
