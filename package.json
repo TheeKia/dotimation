@@ -47,7 +47,7 @@
     }
   },
   "scripts": {
-    "build": "bun scripts/build-worker.ts && bunup --env.NODE_ENV='production' --minify --no-sourcemap --footer '// built with love'",
+    "build": "bun scripts/build-worker.ts && bunup --env.NODE_ENV='production' --minify --no-sourcemap --target browser --footer '// built with love'",
     "build:worker": "bun scripts/build-worker.ts",
     "dev": "bun scripts/build-worker.ts && bun run --cwd test/ui dev",
     "prepare": "bun simple-git-hooks && bun scripts/build-worker.ts",
