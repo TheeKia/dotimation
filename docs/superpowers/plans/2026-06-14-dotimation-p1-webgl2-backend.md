@@ -844,8 +844,12 @@ The `Backend` implementation: ties context, buffers, and the two programs togeth
 
 Create `src/backends/webgl2/index.ts`:
 
+First, make the shared jitter amount DRY: add `export const JITTER_AMOUNT = 1` to `src/engine/constants.ts`, and in `src/backends/canvas2d/simulate.ts` replace its local `const JITTER_AMOUNT = 1` with an import from `@/engine/constants`. Both backends now reference one source. Then create `src/backends/webgl2/index.ts`:
+
 ```ts
-import { JITTER_HZ, COLOR_RATE, OPACITY_RATE, SETTLE_TIME, ZETA } from '@/engine/constants'
+import {
+  COLOR_RATE, JITTER_AMOUNT, JITTER_HZ, OPACITY_RATE, SETTLE_TIME, ZETA,
+} from '@/engine/constants'
 import { planReconcile, STATE_FLOATS } from '@/engine/reconcile-plan'
 import { tuneSpring } from '@/engine/settle'
 import type { Backend, ParticleField } from '@/types'
@@ -893,9 +897,21 @@ export function createWebGL2Backend(opts: WebGL2Options): Backend {
 
   function ensureCapacity(cap: number): void {
     if (!gl || !buffers || buffers.capacity >= cap) return
-    // Grow by reallocating fresh buffers (next pow2 handled by caller's field).
-    disposeBuffers(gl, buffers)
-    buffers = createBuffers(gl, cap)
+    const old = buffers
+    const next = createBuffers(gl, cap)
+    // Preserve the live state buffer (only [0,count) is meaningful) so growing
+    // past capacity doesn't wipe in-flight particles. Targets are re-uploaded by
+    // uploadField right after, so they don't need preserving here.
+    if (count > 0) {
+      gl.bindBuffer(gl.COPY_READ_BUFFER, old.state[old.read])
+      gl.bindBuffer(gl.COPY_WRITE_BUFFER, next.state[0])
+      gl.copyBufferSubData(
+        gl.COPY_READ_BUFFER, gl.COPY_WRITE_BUFFER, 0, 0, count * STATE_STRIDE_BYTES,
+      )
+    }
+    next.read = 0
+    disposeBuffers(gl, old)
+    buffers = next
   }
 
   function init(canvas: HTMLCanvasElement, devicePixelRatio: number): void {
@@ -979,7 +995,7 @@ export function createWebGL2Backend(opts: WebGL2Options): Backend {
       jitterClock += dt
       let jitter = 0
       if (jitterClock >= jitterPeriod) {
-        jitter = 1 // JITTER_AMOUNT (px), matches Canvas2D
+        jitter = JITTER_AMOUNT
         jitterClock -= jitterPeriod
       }
       const b = buffers
@@ -1097,6 +1113,32 @@ git commit -m "feat: async backend selection with dynamic import of webgl2"
 
 The engine-creation effect must now await `selectBackend`, guard against races, and fall back to Canvas2D if WebGL2 `init` throws.
 
+- [ ] **Step 0: Add a context-less `sizeCanvas` helper**
+
+The component currently sizes the visible canvas with `getCtx`, which calls `getContext('2d')`. A canvas can only ever hold ONE context type, so that would make the WebGL2 backend's `getContext('webgl2')` return `null`. Add a sizing helper that does NOT acquire a context, and let each backend acquire its own. In `src/utils/utils.ts`, add below `getCtx`:
+
+```ts
+/**
+ * Sizes a canvas's drawing buffer to device pixels and its CSS box to logical
+ * pixels, WITHOUT acquiring a rendering context — so the caller's backend is
+ * free to take either a '2d' or 'webgl2' context. Returns the dpr used.
+ */
+export function sizeCanvas(
+  canvas: HTMLCanvasElement,
+  width: number,
+  height: number,
+): number {
+  const dpr = Math.min(window.devicePixelRatio || 1, 2)
+  canvas.width = Math.round(width * dpr)
+  canvas.height = Math.round(height * dpr)
+  canvas.style.width = `${width}px`
+  canvas.style.height = `${height}px`
+  return dpr
+}
+```
+
+(`getCtx` stays — the rasterizer still uses it for its offscreen 2D canvas.)
+
 - [ ] **Step 1: Update the engine-creation effect**
 
 In `src/components/dotimation.tsx`, replace the engine-creation `useEffect` with an async-aware version. Keep the rest of the component (props, hook, targets-push effect) unchanged:
@@ -1109,9 +1151,7 @@ In `src/components/dotimation.tsx`, replace the engine-creation `useEffect` with
     let cancelled = false
     let engine: Engine | null = null
 
-    const dpr = Math.min(window.devicePixelRatio || 1, 2)
-    const ctx = getCtx(canvas, width, height)
-    if (!ctx) return
+    const dpr = sizeCanvas(canvas, width, height)
 
     void (async () => {
       let be = await selectBackend({ requested: backend, dotSize })
@@ -1148,10 +1188,11 @@ In `src/components/dotimation.tsx`, replace the engine-creation `useEffect` with
   }, [width, height, backend, dotSize, idle])
 ```
 
-Add the import for the fallback construction at the top of the file:
+Update the imports at the top of the file: add the Canvas2D fallback constructor, and swap the `getCtx` import for `sizeCanvas` (the component no longer needs a 2D context on the visible canvas):
 
 ```tsx
 import { createCanvas2DBackend } from '@/backends/canvas2d'
+import { sizeCanvas } from '@/utils/utils' // replaces the getCtx import
 ```
 
 (`selectBackend` is already imported; ensure its usage is now awaited. `init` is typed `Promise<void> | void`, so `await` is valid for both backends.)
