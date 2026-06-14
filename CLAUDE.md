@@ -32,11 +32,16 @@ The library is one data flow from source content to animated pixels. There is a 
 
 3. **Orchestrator** (`src/engine/engine.ts`) — owns the rAF loop, a fixed-timestep accumulator (`src/engine/clock.ts`, 90 Hz physics), deterministic settle/sleep (`src/engine/settle.ts` — stops the loop ~1.5 s after the last change, so idle CPU cost is ~0%), and an `IntersectionObserver` for visibility gating. Exposes `setField` / `resize` / `dispose` and drives a `Backend` interface.
 
-4. **Backends** (`src/backends/`) — a `Backend` implements `init / uploadField / step / draw / resize / dispose`. P0 ships `canvas2d` (`src/backends/canvas2d/`): SoA spring simulation in `simulate.ts` and a `Uint32`/`ImageData` pixel-push renderer in `render.ts` with hoisted endianness detection. `src/engine/select.ts` picks the backend (`webgpu → webgl2 → canvas2d`); GPU tiers are planned (P1/P2) and currently fall back to `canvas2d`.
+4. **Backends** (`src/backends/`) — a `Backend` implements `init / uploadField / step / draw / resize / dispose`. Two backends ship:
+   - **`canvas2d`** (P0, `src/backends/canvas2d/`): SoA spring simulation in `simulate.ts` and a `Uint32`/`ImageData` pixel-push renderer in `render.ts` with hoisted endianness detection.
+   - **`webgl2`** (P1, `src/backends/webgl2/`): runs the particle simulation on the GPU via **transform feedback** and renders dots as **instanced quads**. Uses the shared pure planner `src/engine/reconcile-plan.ts` (`planReconcile` → `FieldDelta`) for readback-free reconcile→GPU sync (P0's `reconcile` was refactored onto the same planner). New unit-tested pure helpers: `src/engine/viewport.ts` (CSS-px→clip) and `src/engine/reconcile-plan.ts`. The GL pieces are playground-verified (no headless GL).
+   - **WebGPU** remains planned (P2).
+
+   `src/engine/select.ts` is **async** and picks the backend (`webgpu → webgl2 → canvas2d`), loading the WebGL2 backend via **dynamic `import()`** (code-split) and falling back to Canvas2D on any failure or unsupported context.
 
 ### Coordinate systems & DPR
 
-Particle positions are in **CSS pixels**; the canvas backing store is **device pixels** (`width * dpr`). `dpr` is `min(devicePixelRatio, 2)` and is computed consistently in `getCtx` (`src/utils/utils.ts`) and `rasterize`. The engine passes `dpr` to the backend at `init`; the backend handles device-pixel conversion internally.
+Particle positions are in **CSS pixels**; the canvas backing store is **device pixels** (`width * dpr`). `dpr` is `min(devicePixelRatio, 2)`. The component sizes the canvas via `sizeCanvas` (`src/utils/utils.ts`) — a context-less helper — so each backend can acquire its own `2d` or `webgl2` context independently. `getCtx` remains for the rasterizer's offscreen canvas. The engine passes `dpr` to the backend at `init`; the backend handles device-pixel conversion internally.
 
 ## Conventions & gotchas
 
