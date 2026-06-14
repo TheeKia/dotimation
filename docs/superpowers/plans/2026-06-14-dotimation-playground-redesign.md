@@ -16,7 +16,7 @@ This plan touches **only `test/ui/`**, which is the library's manual-verificatio
 
 - **Type-check:** `bunx tsc -b test/ui` → Expected: exits 0 with no diagnostics printed.
 - **Format + lint (Biome, repo-wide, also runs in pre-commit):** `bun run lint:fix` then `bun run lint` → Expected: `Checked N files … No fixes applied.` and exit 0.
-- **ESLint (playground-specific: react-hooks, react-refresh, no-unused-vars):** `bun run --cwd test/ui lint` → Expected: no output, exit 0.
+- **ESLint (playground-specific: react-hooks, react-refresh, no-unused-vars):** `bun run --cwd test/ui lint`. NOTE: the **old** `app.tsx` already violates `react-hooks/purity` (`useRef(performance.now())`) on `main`, so whole-playground ESLint stays red until Task 8 rewrites `app.tsx`. For Tasks 4–7, lint the new files specifically instead, e.g. `bun run --cwd test/ui exec eslint src/hooks/use-fps.ts` → Expected: no output. From Task 8 onward, the whole-playground `lint` must be clean.
 - **Manual (only where something renders):** `bun run dev`, open the printed Vite URL (default `http://localhost:5173/`), observe the stated behavior.
 
 **Incremental safety:** the existing `app.tsx` keeps working and rendering the *old* UI until the final assembly task swaps it. New modules added in Tasks 1–7 are type-checked/linted but not yet imported by `app.tsx`, so the playground stays runnable the whole way. Unused *exports across modules* don't fail `tsc`/ESLint (only unused *locals/imports within a file* do).
@@ -400,8 +400,11 @@ import { useEffect, useRef, useState } from 'react'
 export function useFps(): number {
   const [fps, setFps] = useState(0)
   const frames = useRef(0)
-  const t0 = useRef(performance.now())
+  // Init lazily in the effect — calling performance.now() during render trips
+  // the playground's react-hooks/purity ESLint rule.
+  const t0 = useRef(0)
   useEffect(() => {
+    t0.current = performance.now()
     let id = 0
     const tick = (): void => {
       frames.current++
