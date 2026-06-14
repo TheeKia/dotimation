@@ -48,7 +48,7 @@ export async function rasterize(
     dpr,
     pointSpacingCss,
     alpha,
-    Math.random,
+    undefined,
     maxParticles,
   )
 }

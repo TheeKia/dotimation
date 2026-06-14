@@ -1,7 +1,13 @@
 import { SETTLE_TIME, ZETA } from '@/engine/constants'
+import { isFieldSettled } from '@/engine/rest'
 import { tuneSpring } from '@/engine/settle'
 import type { Backend, ParticleField } from '@/types'
-import { renderField } from './render'
+import {
+  computeDirtyRect,
+  type DirtyRect,
+  renderField,
+  unionRect,
+} from './render'
 import { stepField } from './simulate'
 
 export interface Canvas2DOptions {
@@ -17,6 +23,7 @@ export function createCanvas2DBackend(opts: Canvas2DOptions): Backend {
   let dpr = 1
   let field: ParticleField | null = null
   let dotSize = opts.dotSize
+  let prevDirty: DirtyRect | null = null
   const { k, c } = tuneSpring({ settleTime: SETTLE_TIME, zeta: ZETA })
 
   function ensureBuffer(): void {
@@ -49,14 +56,22 @@ export function createCanvas2DBackend(opts: Canvas2DOptions): Backend {
       if (!ctx || !field) return
       ensureBuffer()
       if (!imageData || !view) return
-      renderField(view, field, devW, devH, dpr, dotSize)
-      ctx.putImageData(imageData, 0, 0)
+      const cur = computeDirtyRect(field, devW, devH, dpr, dotSize)
+      const clearR = unionRect(prevDirty, cur)
+      prevDirty = cur
+      if (!clearR) return
+      renderField(view, field, devW, devH, dpr, dotSize, clearR)
+      ctx.putImageData(imageData, 0, 0, clearR.x, clearR.y, clearR.w, clearR.h)
+    },
+    settled(): boolean {
+      return field ? isFieldSettled(field) : true
     },
     resize(w, h): void {
       devW = w
       devH = h
       imageData = null
       view = null
+      prevDirty = null
       ensureBuffer()
     },
     dispose(): void {

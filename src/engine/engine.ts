@@ -49,7 +49,7 @@ export function createEngine(opts: EngineOptions): Engine {
       backend.draw()
       dirty = false
     }
-    if (idle === 'sleep' && now >= awakeUntil) {
+    if (idle === 'sleep' && (now >= awakeUntil || backend.settled?.())) {
       stop()
       return
     }

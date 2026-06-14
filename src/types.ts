@@ -67,6 +67,8 @@ export interface Backend {
   setDotSize(dotSize: number): void
   step(dt: number): void
   draw(): void
+  /** Optional: true when the field has visibly converged, so the engine may sleep early. */
+  settled?(): boolean
   resize(devW: number, devH: number): void
   dispose(): void
 }

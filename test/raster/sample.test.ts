@@ -78,6 +78,15 @@ describe('sampleTargets maxParticles', () => {
     return p
   }
 
+  test('default RNG keeps every candidate as a permutation', () => {
+    // No `rand` argument → uses the sampler's built-in fast PRNG.
+    const t = sampleTargets(opaque(), 4, 4, 1, 1, 128)
+    expect(t.count).toBe(16)
+    const seen = new Set<string>()
+    for (let i = 0; i < t.count; i++) seen.add(`${t.homeX[i]},${t.homeY[i]}`)
+    expect(seen.size).toBe(16) // all distinct → a true permutation, nothing dropped
+  })
+
   test('kept targets are a distinct valid subset of the candidates', () => {
     let seed = 0.12345
     const rand = (): number => {

@@ -41,7 +41,7 @@ async function run(req: RasterRequest): Promise<FieldTargets> {
     req.dpr,
     req.pointSpacingCss,
     req.alpha,
-    Math.random,
+    undefined,
     req.maxParticles,
   )
 }

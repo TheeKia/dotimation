@@ -1,8 +1,20 @@
 import type { FieldTargets } from '@/types'
 
+// Cheap xorshift32 PRNG for the candidate shuffle — uniform enough for a random
+// subset, and far cheaper than Math.random when sampling tens of thousands of
+// pixels. `rand` stays injectable below so tests are deterministic.
+let rngState = (Date.now() ^ 0x9e3779b9) >>> 0 || 1
+function fastRand(): number {
+  rngState ^= rngState << 13
+  rngState ^= rngState >>> 17
+  rngState ^= rngState << 5
+  rngState >>>= 0
+  return rngState / 0xffffffff
+}
+
 /**
  * Samples a device-pixel RGBA buffer into FieldTargets. Pure and DOM-free.
- * `rand` is injectable for deterministic tests (defaults to Math.random).
+ * `rand` is injectable for deterministic tests (defaults to a fast PRNG).
  */
 export function sampleTargets(
   pixels: Uint8ClampedArray,
@@ -11,7 +23,7 @@ export function sampleTargets(
   dpr: number,
   pointSpacingCss: number,
   alpha: number,
-  rand: () => number = Math.random,
+  rand: () => number = fastRand,
   maxParticles: number = Number.POSITIVE_INFINITY,
 ): FieldTargets {
   const step = Math.max(1, Math.round(pointSpacingCss * dpr))
