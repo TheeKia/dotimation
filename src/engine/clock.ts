@@ -1,7 +1,7 @@
 export const PHYSICS_HZ = 90
-export const FIXED_DT = 1 / PHYSICS_HZ
+export const FIXED_DT: number = 1 / PHYSICS_HZ
 export const MAX_STEPS_PER_FRAME = 8
-export const MAX_FRAME_DELTA = MAX_STEPS_PER_FRAME * FIXED_DT
+export const MAX_FRAME_DELTA: number = MAX_STEPS_PER_FRAME * FIXED_DT
 
 /**
  * Given the carried accumulator and a frame delta (seconds), returns how many
