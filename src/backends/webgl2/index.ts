@@ -1,7 +1,6 @@
 import {
   COLOR_RATE,
   JITTER_AMOUNT,
-  JITTER_HZ,
   OPACITY_RATE,
   SETTLE_TIME,
   ZETA,
@@ -40,8 +39,6 @@ export function createWebGL2Backend(opts: WebGL2Options): Backend {
   let lost = false
   let lastUpload = 0
   const { k, c } = tuneSpring({ settleTime: SETTLE_TIME, zeta: ZETA })
-  const jitterPeriod = 1 / JITTER_HZ
-  let jitterClock = 0
   // Faders fade out at OPACITY_RATE; after this long they are invisible and the
   // tail can be dropped. The Canvas2D backend compacts faders in stepField; the
   // GPU sim doesn't change count, so we expire them here by elapsed time.
@@ -167,20 +164,15 @@ export function createWebGL2Backend(opts: WebGL2Options): Backend {
       if (count > active && performance.now() - lastUpload > FADE_DURATION_MS) {
         count = active
       }
-      jitterClock += dt
-      let jitter = 0
-      if (jitterClock >= jitterPeriod) {
-        jitter = JITTER_AMOUNT
-        jitterClock -= jitterPeriod
-      }
       const b = buffers
+      // Jitter every step, matching the Canvas2D backend's shimmer frequency.
       sim.step(b.state[b.read]!, b.state[b.read ^ 1]!, b.targets, count, {
         dt,
         k,
         c,
         colorRate: COLOR_RATE,
         opacityRate: OPACITY_RATE,
-        jitter,
+        jitter: JITTER_AMOUNT,
         seed: Math.random() * 1000,
       })
       b.read = (b.read ^ 1) as 0 | 1

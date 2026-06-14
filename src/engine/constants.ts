@@ -16,7 +16,9 @@ export const ZETA = 1
 export const OPACITY_RATE = 2
 /** Per-second color ease rate toward home color. */
 export const COLOR_RATE = 2
-/** Per-jitter horizontal nudge (px) applied to X for the shimmer effect. */
+/**
+ * Per-step horizontal nudge (px) applied to X for the shimmer effect. Applied
+ * every physics step by both backends (Canvas2D in stepField, WebGL2 in the sim
+ * shader) so the shimmer frequency matches across tiers.
+ */
 export const JITTER_AMOUNT = 1
-/** Jitter frequency (Hz) — how often the horizontal shimmer nudge fires. */
-export const JITTER_HZ = 30
