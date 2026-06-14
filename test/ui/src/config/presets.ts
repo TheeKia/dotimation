@@ -10,7 +10,7 @@ export const TEXT_DEFAULT: TextItemConfig = {
   data: 'Hello\nDotimation',
   fontFamily: 'sans-serif',
   fontSize: 'AUTO',
-  textColor: '#ff00ff',
+  textColor: '#22d3ee',
 }
 
 export const IMAGE_DEFAULT: ImageItemConfig = {
