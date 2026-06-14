@@ -84,6 +84,8 @@ export function createWebGL2Backend(opts: WebGL2Options): Backend {
       gl.ONE,
       gl.ONE_MINUS_SRC_ALPHA,
     )
+    // Clear color never changes; set once here instead of per frame.
+    gl.clearColor(0, 0, 0, 0)
     gl.viewport(0, 0, devW, devH)
   }
 
@@ -234,8 +236,8 @@ export function createWebGL2Backend(opts: WebGL2Options): Backend {
     },
     draw(): void {
       if (!gl || !buffers || !draw || lost) return
-      gl.viewport(0, 0, devW, devH)
-      gl.clearColor(0, 0, 0, 0)
+      // viewport + clearColor are set on init/resize and never change here, so
+      // only the per-frame clear remains.
       gl.clear(gl.COLOR_BUFFER_BIT)
       const b = buffers
       draw.use(b.read, count, {
