@@ -10,6 +10,69 @@ function clamp255(v: number): number {
   return v < 0 ? 0 : v > 255 ? 255 : v | 0
 }
 
+export interface DirtyRect {
+  x: number
+  y: number
+  w: number
+  h: number
+}
+
+/**
+ * Device-pixel bounding box of every visible (alpha>0) dot, expanded by the
+ * footprint and clamped to the canvas. Null when nothing is visible. The box is
+ * a superset of every pixel renderField writes this frame, so the backend can
+ * clear and upload just this region instead of the whole buffer.
+ */
+export function computeDirtyRect(
+  field: ParticleField,
+  devW: number,
+  devH: number,
+  dpr: number,
+  dotSize: number,
+): DirtyRect | null {
+  const size = Math.max(1, Math.round(dotSize))
+  const { x, y, alpha } = field
+  const count = field.count
+  let minX = Infinity
+  let minY = Infinity
+  let maxX = -Infinity
+  let maxY = -Infinity
+  for (let i = 0; i < count; i++) {
+    if (alpha[i]! <= 0) continue
+    const bx = (x[i]! * dpr + 0.5) | 0
+    const by = (y[i]! * dpr + 0.5) | 0
+    if (bx < minX) minX = bx
+    if (by < minY) minY = by
+    if (bx > maxX) maxX = bx
+    if (by > maxY) maxY = by
+  }
+  if (minX === Infinity) return null
+  const x0 = minX < 0 ? 0 : minX
+  const y0 = minY < 0 ? 0 : minY
+  const x1 = Math.min(devW, maxX + size)
+  const y1 = Math.min(devH, maxY + size)
+  if (x1 <= x0 || y1 <= y0) return null
+  return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 }
+}
+
+/** Smallest rect covering both inputs; the non-null side if one is null; null if both are. */
+export function unionRect(
+  a: DirtyRect | null,
+  b: DirtyRect | null,
+): DirtyRect | null {
+  if (!a) return b
+  if (!b) return a
+  const x0 = a.x < b.x ? a.x : b.x
+  const y0 = a.y < b.y ? a.y : b.y
+  const ax1 = a.x + a.w
+  const bx1 = b.x + b.w
+  const ay1 = a.y + a.h
+  const by1 = b.y + b.h
+  const x1 = ax1 > bx1 ? ax1 : bx1
+  const y1 = ay1 > by1 ? ay1 : by1
+  return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 }
+}
+
 // Endianness is fixed for the process, so the packer is resolved once at module
 // load instead of branching (or allocating a closure) per frame.
 const pack: (r: number, g: number, b: number, a: number) => number =
@@ -41,9 +104,10 @@ function compositePixel(
   const db = little ? (dst >>> 16) & 0xff : (dst >>> 8) & 0xff
   const da = (little ? (dst >>> 24) & 0xff : dst & 0xff) / 255
   const outA = clampedA + da * (1 - clampedA)
-  const outR = (sr * clampedA + dr * da * (1 - clampedA)) / outA
-  const outG = (sg * clampedA + dg * da * (1 - clampedA)) / outA
-  const outB = (sb * clampedA + db * da * (1 - clampedA)) / outA
+  const inv = 1 / outA
+  const outR = (sr * clampedA + dr * da * (1 - clampedA)) * inv
+  const outG = (sg * clampedA + dg * da * (1 - clampedA)) * inv
+  const outB = (sb * clampedA + db * da * (1 - clampedA)) * inv
   view[idx] = pack(
     (outR + 0.5) | 0,
     (outG + 0.5) | 0,
@@ -65,8 +129,18 @@ export function renderField(
   devH: number,
   dpr: number,
   dotSize: number,
+  clearRect?: DirtyRect | null,
 ): void {
-  view.fill(0)
+  if (clearRect) {
+    const { x: cx, y: cy, w: cw, h: ch } = clearRect
+    const yEnd = cy + ch
+    for (let row = cy; row < yEnd; row++) {
+      const base = row * devW + cx
+      view.fill(0, base, base + cw)
+    }
+  } else {
+    view.fill(0)
+  }
   const size = Math.max(1, Math.round(dotSize))
   const { x, y, r, g, b, alpha } = field
   const count = field.count

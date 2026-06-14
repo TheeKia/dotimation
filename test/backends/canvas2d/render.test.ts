@@ -1,5 +1,9 @@
 import { describe, expect, test } from 'bun:test'
-import { renderField } from '@/backends/canvas2d/render'
+import {
+  computeDirtyRect,
+  renderField,
+  unionRect,
+} from '@/backends/canvas2d/render'
 import { createField, reconcile } from '@/engine/field'
 import type { FieldTargets } from '@/types'
 
@@ -100,5 +104,85 @@ describe('renderField', () => {
     const view = new Uint32Array(8 * 8)
     renderField(view, f, 8, 8, 1, 2)
     expect(view.reduce((n, v) => n + (v !== 0 ? 1 : 0), 0)).toBe(4)
+  })
+})
+
+describe('computeDirtyRect', () => {
+  test('tight box around a single dot at dotSize 1', () => {
+    const f = reconcile(createField(1), one(2, 3))
+    f.x[0] = 2
+    f.y[0] = 3
+    f.alpha[0] = 1
+    expect(computeDirtyRect(f, 8, 8, 1, 1)).toEqual({ x: 2, y: 3, w: 1, h: 1 })
+  })
+
+  test('expands by the footprint for dotSize 2', () => {
+    const f = reconcile(createField(1), one(2, 3))
+    f.x[0] = 2
+    f.y[0] = 3
+    f.alpha[0] = 1
+    expect(computeDirtyRect(f, 8, 8, 1, 2)).toEqual({ x: 2, y: 3, w: 2, h: 2 })
+  })
+
+  test('null when nothing is visible', () => {
+    const f = reconcile(createField(1), one(2, 3))
+    f.alpha[0] = 0
+    expect(computeDirtyRect(f, 8, 8, 1, 1)).toBeNull()
+  })
+
+  test('clamps to the canvas bounds', () => {
+    const f = reconcile(createField(1), one(7, 7))
+    f.x[0] = 7
+    f.y[0] = 7
+    f.alpha[0] = 1
+    expect(computeDirtyRect(f, 8, 8, 1, 4)).toEqual({ x: 7, y: 7, w: 1, h: 1 })
+  })
+})
+
+describe('unionRect', () => {
+  test('covers both rects', () => {
+    expect(
+      unionRect({ x: 0, y: 0, w: 1, h: 1 }, { x: 3, y: 3, w: 1, h: 1 }),
+    ).toEqual({ x: 0, y: 0, w: 4, h: 4 })
+  })
+  test('returns the non-null side', () => {
+    expect(unionRect(null, { x: 2, y: 2, w: 1, h: 1 })).toEqual({
+      x: 2,
+      y: 2,
+      w: 1,
+      h: 1,
+    })
+    expect(unionRect({ x: 2, y: 2, w: 1, h: 1 }, null)).toEqual({
+      x: 2,
+      y: 2,
+      w: 1,
+      h: 1,
+    })
+    expect(unionRect(null, null)).toBeNull()
+  })
+})
+
+describe('renderField scoped clear', () => {
+  test('with a clearRect, pixels outside the rect are left untouched', () => {
+    const f = reconcile(createField(1), one(2, 2))
+    f.x[0] = 2
+    f.y[0] = 2
+    f.alpha[0] = 1
+    const view = new Uint32Array(8 * 8).fill(0xdeadbeef)
+    renderField(view, f, 8, 8, 1, 1, { x: 1, y: 1, w: 3, h: 3 })
+    expect(view[0]).toBe(0xdeadbeef)
+    expect(view[7 * 8 + 7]).toBe(0xdeadbeef)
+    expect(view[2 * 8 + 2]).not.toBe(0xdeadbeef)
+    expect(view[2 * 8 + 2]).not.toBe(0)
+  })
+
+  test('without a clearRect, the whole buffer is cleared (back-compat)', () => {
+    const f = reconcile(createField(1), one(2, 2))
+    f.x[0] = 2
+    f.y[0] = 2
+    f.alpha[0] = 1
+    const view = new Uint32Array(8 * 8).fill(0xdeadbeef)
+    renderField(view, f, 8, 8, 1, 1)
+    expect(view[0]).toBe(0)
   })
 })
