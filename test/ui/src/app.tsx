@@ -1,180 +1,62 @@
 import './index.css'
 
-import clsx from 'clsx'
-import { type AnimateItem, type BackendKind, Dotimation } from 'dotimation'
-import { useEffect, useRef, useState } from 'react'
-import { useScreen } from './hooks/use-screen'
+import type { DotimationStats } from 'dotimation'
+import { useEffect, useState } from 'react'
+import { Inspector } from './components/inspector/inspector'
+import { Stage } from './components/stage/stage'
+import { StatsBar } from './components/stats-bar'
+import { useConfig } from './config/use-config'
 
-type DotimationStats = { backend: string; particles: number }
-
-const TEST_ITEMS: { label: string; item: AnimateItem }[] = [
-  {
-    label: 'Auto Size',
-    item: {
-      type: 'text',
-      data: 'Hello\nThis is a second line',
-      fontSize: 'AUTO',
-      fontFamily: 'sans-serif',
-      textColor: 'rgb(255,0,255)',
-    },
-  },
-  {
-    label: 'Auto Size (Short)',
-    item: {
-      type: 'text',
-      data: 'Hello',
-      fontSize: 'AUTO',
-      fontFamily: 'sans-serif',
-    },
-  },
-  {
-    label: 'Auto Mono Size',
-    item: {
-      type: 'text',
-      data: 'Hello\nThis is a second line',
-      fontSize: 'AUTO_MONO',
-      fontFamily: 'monospace',
-    },
-  },
-  {
-    label: 'Fixed Size',
-    item: { type: 'text', data: 'Hi', fontSize: 30 },
-  },
-  {
-    label: 'Image',
-    item: {
-      type: 'image',
-      data: 'https://th-wave.s3.us-east-1.amazonaws.com/general/logo.svg',
-    },
-  },
-  {
-    label: 'Image (Inverted)',
-    item: {
-      type: 'image',
-      data: 'https://th-wave.s3.us-east-1.amazonaws.com/general/logo.svg',
-      invert: true,
-    },
-  },
-  {
-    label: 'Stress (many dots)',
-    item: {
-      type: 'text',
-      data: 'DOTIMATION\nDOTIMATION\nDOTIMATION\nDOTIMATION',
-      fontSize: 'AUTO',
-      fontFamily: 'sans-serif',
-    },
-  },
-]
-
-function useFps(): number {
-  const [fps, setFps] = useState(0)
-  const frames = useRef(0)
-  const t0 = useRef(performance.now())
-  useEffect(() => {
-    let id = 0
-    const tick = (): void => {
-      frames.current++
-      const now = performance.now()
-      if (now - t0.current >= 500) {
-        setFps(Math.round((frames.current * 1000) / (now - t0.current)))
-        frames.current = 0
-        t0.current = now
-      }
-      id = requestAnimationFrame(tick)
-    }
-    id = requestAnimationFrame(tick)
-    return () => cancelAnimationFrame(id)
-  }, [])
-  return fps
+function Wordmark(): React.ReactNode {
+  return (
+    <div className="flex items-center gap-2">
+      <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden>
+        <title>dotimation</title>
+        {[2, 8, 14].map((y) =>
+          [2, 8, 14].map((x) => (
+            <circle
+              key={`${x}-${y}`}
+              cx={x}
+              cy={y}
+              r="1.4"
+              fill="currentColor"
+            />
+          )),
+        )}
+      </svg>
+      <span className="text-sm font-semibold tracking-tight">dotimation</span>
+    </div>
+  )
 }
 
-export function App() {
-  const [item, setItem] = useState<AnimateItem>(TEST_ITEMS[0].item)
-  const [backend, setBackend] = useState<BackendKind>('auto')
-  const [dotSize, setDotSize] = useState(1)
-  const [idle, setIdle] = useState<'sleep' | 'animate'>('animate')
+export default function App(): React.ReactNode {
+  const api = useConfig()
   const [stats, setStats] = useState<DotimationStats | null>(null)
-  const [maxParticles, setMaxParticles] = useState<number | undefined>(
-    undefined,
-  )
-  const screen = useScreen()
-  const fps = useFps()
+  const { swap } = api
+
+  // Space toggles A/B (ignored while typing into a form control).
+  useEffect(() => {
+    function onKey(e: KeyboardEvent): void {
+      if (e.code !== 'Space') return
+      const t = e.target as HTMLElement | null
+      if (t && /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)) return
+      e.preventDefault()
+      swap()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [swap])
 
   return (
-    <main className="flex size-screen pt-3">
-      <div className="fixed top-2 left-2 text-xs font-mono opacity-70">
-        {fps} fps · {backend} · dot {dotSize} · {idle}
-        {stats ? ` · ${stats.backend} · ${stats.particles} dots` : ''}
+    <div className="flex h-screen w-screen flex-col overflow-hidden bg-background text-foreground">
+      <header className="flex h-11 shrink-0 items-center justify-between border-b border-border px-4">
+        <Wordmark />
+        <StatsBar stats={stats} />
+      </header>
+      <div className="flex min-h-0 flex-1">
+        <Inspector api={api} />
+        <Stage api={api} onStats={setStats} />
       </div>
-      <Dotimation
-        item={item}
-        width={screen.width}
-        height={screen.height - 48}
-        backend={backend}
-        dotSize={dotSize}
-        idle={idle}
-        onStats={setStats}
-        maxParticles={maxParticles}
-      />
-      <div className="fixed bottom-2 inset-x-0 w-full flex flex-wrap items-center justify-center gap-1">
-        {TEST_ITEMS.map(({ label, item: data }) => (
-          <button
-            key={label}
-            type="button"
-            onClick={() => setItem(data)}
-            className={clsx(
-              'cursor-pointer hover:bg-primary/10 px-2 h-7 rounded-md text-xs',
-              data === item && 'bg-primary/10',
-            )}
-          >
-            {label}
-          </button>
-        ))}
-        {(['auto', 'canvas2d', 'webgl2', 'webgpu'] as BackendKind[]).map(
-          (b) => (
-            <button
-              key={b}
-              type="button"
-              onClick={() => setBackend(b)}
-              className={clsx(
-                'cursor-pointer hover:bg-primary/10 px-2 h-7 rounded-md text-xs',
-                backend === b && 'bg-primary/10',
-              )}
-            >
-              {b}
-            </button>
-          ),
-        )}
-        <button
-          type="button"
-          onClick={() => setDotSize((d) => (d === 1 ? 2 : 1))}
-          className="cursor-pointer hover:bg-primary/10 px-2 h-7 rounded-md text-xs"
-        >
-          dotSize
-        </button>
-        <button
-          type="button"
-          onClick={() =>
-            setIdle((v) => (v === 'animate' ? 'sleep' : 'animate'))
-          }
-          className="cursor-pointer hover:bg-primary/10 px-2 h-7 rounded-md text-xs"
-        >
-          idle: {idle}
-        </button>
-        <button
-          type="button"
-          onClick={() =>
-            setMaxParticles((v) =>
-              v === undefined ? 5000 : v === 5000 ? 20000 : undefined,
-            )
-          }
-          className="cursor-pointer hover:bg-primary/10 px-2 h-7 rounded-md text-xs"
-        >
-          max: {maxParticles ?? '∞'}
-        </button>
-      </div>
-    </main>
+    </div>
   )
 }
-
-export default App
