@@ -1,4 +1,5 @@
 import { SETTLE_TIME, ZETA } from '@/engine/constants'
+import { isFieldSettled } from '@/engine/rest'
 import { tuneSpring } from '@/engine/settle'
 import type { Backend, ParticleField } from '@/types'
 import {
@@ -61,6 +62,9 @@ export function createCanvas2DBackend(opts: Canvas2DOptions): Backend {
       if (!clearR) return
       renderField(view, field, devW, devH, dpr, dotSize, clearR)
       ctx.putImageData(imageData, 0, 0, clearR.x, clearR.y, clearR.w, clearR.h)
+    },
+    settled(): boolean {
+      return field ? isFieldSettled(field) : true
     },
     resize(w, h): void {
       devW = w
