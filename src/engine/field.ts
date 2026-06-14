@@ -1,4 +1,5 @@
 import type { FieldTargets, ParticleField } from '@/types'
+import { planReconcile } from './reconcile-plan'
 
 const ARRAY_KEYS = [
   'x',
@@ -78,15 +79,11 @@ export function reconcile(
   field: ParticleField,
   targets: FieldTargets,
 ): ParticleField {
-  const newActive = targets.count
-  const oldActive = field.active
-  const oldCount = field.count
-  const oldFaders = oldCount - oldActive
+  const plan = planReconcile(field.active, field.count, targets.count)
+  const f = growField(field, Math.max(field.count, plan.count))
 
-  const f = growField(field, Math.max(oldCount, newActive + oldFaders))
-
-  if (oldCount === 0) {
-    for (let i = 0; i < newActive; i++) {
+  if (plan.firstLoad) {
+    for (let i = 0; i < targets.count; i++) {
       f.x[i] = targets.homeX[i]!
       f.y[i] = targets.homeY[i]!
       f.vx[i] = 0
@@ -97,40 +94,38 @@ export function reconcile(
       f.alpha[i] = 0
       retargetActive(f, i, targets)
     }
-    f.active = newActive
-    f.count = newActive
+    f.active = plan.active
+    f.count = plan.count
     return f
   }
 
-  if (newActive <= oldActive) {
-    for (let i = 0; i < newActive; i++) retargetActive(f, i, targets)
-    for (let i = newActive; i < oldCount; i++) f.targetAlpha[i] = 0
-    f.active = newActive
-    f.count = oldCount
-    return f
-  }
-
-  for (let j = oldFaders - 1; j >= 0; j--)
-    copySlot(f, oldActive + j, newActive + j)
-  for (let i = oldActive; i < newActive; i++) {
-    if (oldActive > 0) {
-      // Seed the fly-in from an existing active particle.
-      copySlot(f, i % oldActive, i)
-    } else {
-      // No prior actives to seed from (field held only faders): start at
-      // home, fully transparent, and fade in place — same as first load.
-      f.x[i] = targets.homeX[i]!
-      f.y[i] = targets.homeY[i]!
-      f.r[i] = targets.homeR[i]!
-      f.g[i] = targets.homeG[i]!
-      f.b[i] = targets.homeB[i]!
+  if (plan.relocate) {
+    for (let j = plan.relocate.len - 1; j >= 0; j--) {
+      copySlot(f, plan.relocate.from + j, plan.relocate.to + j)
     }
-    f.vx[i] = 0
-    f.vy[i] = 0
-    f.alpha[i] = 0
   }
-  for (let i = 0; i < newActive; i++) retargetActive(f, i, targets)
-  f.active = newActive
-  f.count = newActive + oldFaders
+
+  if (plan.spawn) {
+    const prevActive = field.active
+    for (let i = plan.spawn.start; i < plan.spawn.end; i++) {
+      if (prevActive > 0) {
+        copySlot(f, i % prevActive, i)
+      } else {
+        f.x[i] = targets.homeX[i]!
+        f.y[i] = targets.homeY[i]!
+        f.r[i] = targets.homeR[i]!
+        f.g[i] = targets.homeG[i]!
+        f.b[i] = targets.homeB[i]!
+      }
+      f.vx[i] = 0
+      f.vy[i] = 0
+      f.alpha[i] = 0
+    }
+  }
+
+  for (let i = 0; i < plan.active; i++) retargetActive(f, i, targets)
+  for (let i = plan.active; i < plan.count; i++) f.targetAlpha[i] = 0
+  f.active = plan.active
+  f.count = plan.count
   return f
 }
