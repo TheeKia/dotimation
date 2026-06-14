@@ -47,6 +47,9 @@ export function stepField(
     const ay = k * (homeY[i]! - y[i]!) - c * vy[i]!
     vx[i]! += ax * dt
     vy[i]! += ay * dt
+    // Jitter is applied to X only — a deliberate horizontal shimmer carried
+    // over from the original engine. Do not add Y jitter without intent: it
+    // would change the established visual look.
     x[i]! += vx[i]! * dt + (rand() - 0.5) * JITTER_AMOUNT
     y[i]! += vy[i]! * dt
     r[i] = expLerp(r[i]!, homeR[i]!, COLOR_RATE, dt)

@@ -24,7 +24,7 @@ export function renderField(
   dotSize: number,
 ): void {
   view.fill(0)
-  const size = Math.max(1, dotSize | 0)
+  const size = Math.max(1, Math.round(dotSize))
   const little = IS_LITTLE_ENDIAN
 
   const pack = little
@@ -60,7 +60,6 @@ export function renderField(
         const db = little ? (dst >>> 16) & 0xff : (dst >>> 8) & 0xff
         const da = (little ? (dst >>> 24) & 0xff : dst & 0xff) / 255
         const outA = clampedA + da * (1 - clampedA)
-        if (outA <= 0) continue
         const outR = (sr * clampedA + dr * da * (1 - clampedA)) / outA
         const outG = (sg * clampedA + dg * da * (1 - clampedA)) / outA
         const outB = (sb * clampedA + db * da * (1 - clampedA)) / outA

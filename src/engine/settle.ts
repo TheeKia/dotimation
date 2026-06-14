@@ -1,3 +1,9 @@
+/**
+ * Tunes a mass-spring-damper from a target settle time and damping ratio.
+ * The `4/(zeta*settleTime)` natural-frequency formula is the 2% settling-time
+ * criterion, which is only accurate for `zeta <= 1` (under/critically damped).
+ * `computeSettleDuration` relies on that, so passing `zeta > 1` is unsupported.
+ */
 export function tuneSpring({
   settleTime,
   zeta,
