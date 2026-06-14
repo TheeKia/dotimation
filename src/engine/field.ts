@@ -1,4 +1,4 @@
-import type { ParticleField } from '@/types'
+import type { FieldTargets, ParticleField } from '@/types'
 
 const ARRAY_KEYS = [
   'x',
@@ -55,4 +55,71 @@ export function growField(
   next.count = field.count
   for (const key of ARRAY_KEYS) next[key].set(field[key])
   return next
+}
+
+function copySlot(field: ParticleField, src: number, dst: number): void {
+  for (const key of ARRAY_KEYS) field[key][dst] = field[key][src]!
+}
+
+function retargetActive(
+  field: ParticleField,
+  i: number,
+  t: FieldTargets,
+): void {
+  field.homeX[i] = t.homeX[i]!
+  field.homeY[i] = t.homeY[i]!
+  field.homeR[i] = t.homeR[i]!
+  field.homeG[i] = t.homeG[i]!
+  field.homeB[i] = t.homeB[i]!
+  field.targetAlpha[i] = 1
+}
+
+export function reconcile(
+  field: ParticleField,
+  targets: FieldTargets,
+): ParticleField {
+  const newActive = targets.count
+  const oldActive = field.active
+  const oldCount = field.count
+  const oldFaders = oldCount - oldActive
+
+  const f = growField(field, Math.max(oldCount, newActive + oldFaders))
+
+  if (oldCount === 0) {
+    for (let i = 0; i < newActive; i++) {
+      f.x[i] = targets.homeX[i]!
+      f.y[i] = targets.homeY[i]!
+      f.vx[i] = 0
+      f.vy[i] = 0
+      f.r[i] = targets.homeR[i]!
+      f.g[i] = targets.homeG[i]!
+      f.b[i] = targets.homeB[i]!
+      f.alpha[i] = 0
+      retargetActive(f, i, targets)
+    }
+    f.active = newActive
+    f.count = newActive
+    return f
+  }
+
+  if (newActive <= oldActive) {
+    for (let i = 0; i < newActive; i++) retargetActive(f, i, targets)
+    for (let i = newActive; i < oldCount; i++) f.targetAlpha[i] = 0
+    f.active = newActive
+    f.count = oldCount
+    return f
+  }
+
+  for (let j = oldFaders - 1; j >= 0; j--)
+    copySlot(f, oldActive + j, newActive + j)
+  for (let i = oldActive; i < newActive; i++) {
+    copySlot(f, i % oldActive, i)
+    f.vx[i] = 0
+    f.vy[i] = 0
+    f.alpha[i] = 0
+  }
+  for (let i = 0; i < newActive; i++) retargetActive(f, i, targets)
+  f.active = newActive
+  f.count = newActive + oldFaders
+  return f
 }
