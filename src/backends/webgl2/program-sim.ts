@@ -124,12 +124,17 @@ export function createSimProgram(gl: WebGL2RenderingContext): SimProgram {
       // biome-ignore lint/correctness/useHookAtTopLevel: gl.useProgram is a WebGL method, not a React hook
       gl.useProgram(program)
       gl.bindVertexArray(vaos[read])
-      // The VAO already carries every attribute→buffer association, so clear the
-      // global ARRAY_BUFFER binding. Otherwise a state buffer left bound there by
-      // uploadField/draw can collide with the transform-feedback output buffer
-      // (a buffer can't be a TF target and bound elsewhere), which the driver
-      // rejects with GL_INVALID_OPERATION — silently dropping the sim write.
+      // The VAO already carries every attribute→buffer association, so clear
+      // every non-transform-feedback binding that may still point at a state
+      // buffer. A buffer can't be a TF output and bound elsewhere at the same
+      // time, or the driver rejects glDrawArrays with GL_INVALID_OPERATION and
+      // silently drops the sim write (frozen particles). uploadField's relocate
+      // path leaves BOTH ping-pong buffers bound to COPY_READ_BUFFER/
+      // COPY_WRITE_BUFFER (and ensureCapacity leaves one), so clear those too —
+      // not just ARRAY_BUFFER left bound by uploadField/draw.
       gl.bindBuffer(gl.ARRAY_BUFFER, null)
+      gl.bindBuffer(gl.COPY_READ_BUFFER, null)
+      gl.bindBuffer(gl.COPY_WRITE_BUFFER, null)
 
       gl.uniform1f(loc.uDt, u.dt)
       gl.uniform1f(loc.uK, u.k)
