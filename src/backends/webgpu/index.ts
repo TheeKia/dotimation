@@ -1,3 +1,4 @@
+import { FIXED_DT } from '@/engine/clock'
 import {
   COLOR_RATE,
   JITTER_AMOUNT,
@@ -56,6 +57,10 @@ export function createWebGPUBackend(opts: WebGPUOptions): Backend {
   // The render uniforms (devW/devH/dpr/dotSize) change only on resize/dotSize,
   // so the GPU write is skipped on frames where they are unchanged.
   let renderUniformDirty = true
+  // Steps are accumulated by step() and flushed in draw() so the whole frame
+  // (all compute passes + the render pass) is one encoder / one submit.
+  let pendingSteps = 0
+  let stepDt = FIXED_DT
 
   function rebuildBindGroups(): void {
     if (!device || !pipelines || !buffers) return
@@ -182,29 +187,38 @@ export function createWebGPUBackend(opts: WebGPUOptions): Backend {
       if (count > active && performance.now() - lastUpload > FADE_DURATION_MS) {
         count = active
       }
-      const b = buffers
-      simU[0] = dt
-      simU[1] = k
-      simU[2] = c
-      simU[3] = COLOR_RATE
-      simU[4] = OPACITY_RATE
-      simU[5] = JITTER_AMOUNT
-      simU[6] = Math.random() * 1000
-      simU[7] = count
-      device.queue.writeBuffer(pipelines.simUniform, 0, simU)
-      const enc = device.createCommandEncoder()
-      const pass = enc.beginComputePass()
-      pass.setPipeline(pipelines.compute)
-      pass.setBindGroup(0, simBindGroups[b.read])
-      pass.dispatchWorkgroups(Math.ceil(count / 64))
-      pass.end()
-      device.queue.submit([enc.finish()])
-      b.read = (b.read ^ 1) as 0 | 1
+      // Record intent only — the GPU work is flushed once in draw() so the whole
+      // frame is one encoder / one submit.
+      stepDt = dt
+      pendingSteps++
     },
     draw(): void {
-      if (!device || !context || !buffers || !pipelines || !renderBind || lost)
+      if (
+        !device ||
+        !context ||
+        !buffers ||
+        !pipelines ||
+        !renderBind ||
+        lost
+      ) {
+        pendingSteps = 0
         return
+      }
       const b = buffers
+      const steps = pendingSteps
+      pendingSteps = 0
+
+      if (steps > 0 && count > 0 && simBindGroups) {
+        simU[0] = stepDt
+        simU[1] = k
+        simU[2] = c
+        simU[3] = COLOR_RATE
+        simU[4] = OPACITY_RATE
+        simU[5] = JITTER_AMOUNT
+        simU[6] = Math.random() * 1000
+        simU[7] = count
+        device.queue.writeBuffer(pipelines.simUniform, 0, simU)
+      }
       if (renderUniformDirty) {
         renderU[0] = devW
         renderU[1] = devH
@@ -213,7 +227,24 @@ export function createWebGPUBackend(opts: WebGPUOptions): Backend {
         device.queue.writeBuffer(pipelines.renderUniform, 0, renderU)
         renderUniformDirty = false
       }
+
       const enc = device.createCommandEncoder()
+
+      if (count > 0 && simBindGroups) {
+        // One compute pass per step: WebGPU inserts a barrier between passes, so
+        // the ping-pong write of pass N is visible to the read of pass N+1.
+        let r = b.read
+        for (let s = 0; s < steps; s++) {
+          const sim = enc.beginComputePass()
+          sim.setPipeline(pipelines.compute)
+          sim.setBindGroup(0, simBindGroups[r])
+          sim.dispatchWorkgroups(Math.ceil(count / 64))
+          sim.end()
+          r ^= 1
+        }
+        b.read = r as 0 | 1
+      }
+
       const view = context.getCurrentTexture().createView()
       const pass = enc.beginRenderPass({
         colorAttachments: [
