@@ -53,6 +53,15 @@ const TEST_ITEMS: { label: string; item: AnimateItem }[] = [
       invert: true,
     },
   },
+  {
+    label: 'Stress (many dots)',
+    item: {
+      type: 'text',
+      data: 'DOTIMATION\nDOTIMATION\nDOTIMATION\nDOTIMATION',
+      fontSize: 'AUTO',
+      fontFamily: 'sans-serif',
+    },
+  },
 ]
 
 function useFps(): number {
@@ -81,13 +90,14 @@ export function App() {
   const [item, setItem] = useState<AnimateItem>(TEST_ITEMS[0].item)
   const [backend, setBackend] = useState<BackendKind>('auto')
   const [dotSize, setDotSize] = useState(1)
+  const [idle, setIdle] = useState<'sleep' | 'animate'>('animate')
   const screen = useScreen()
   const fps = useFps()
 
   return (
     <main className="flex size-screen pt-3">
       <div className="fixed top-2 left-2 text-xs font-mono opacity-70">
-        {fps} fps · {backend} · dot {dotSize}
+        {fps} fps · {backend} · dot {dotSize} · {idle}
       </div>
       <Dotimation
         item={item}
@@ -95,6 +105,7 @@ export function App() {
         height={screen.height - 48}
         backend={backend}
         dotSize={dotSize}
+        idle={idle}
       />
       <div className="fixed bottom-2 inset-x-0 w-full flex flex-wrap items-center justify-center gap-1">
         {TEST_ITEMS.map(({ label, item: data }) => (
@@ -110,7 +121,7 @@ export function App() {
             {label}
           </button>
         ))}
-        {(['auto', 'canvas2d'] as BackendKind[]).map((b) => (
+        {(['auto', 'canvas2d', 'webgl2'] as BackendKind[]).map((b) => (
           <button
             key={b}
             type="button"
@@ -129,6 +140,15 @@ export function App() {
           className="cursor-pointer hover:bg-primary/10 px-2 h-7 rounded-md text-xs"
         >
           dotSize
+        </button>
+        <button
+          type="button"
+          onClick={() =>
+            setIdle((v) => (v === 'animate' ? 'sleep' : 'animate'))
+          }
+          className="cursor-pointer hover:bg-primary/10 px-2 h-7 rounded-md text-xs"
+        >
+          idle: {idle}
         </button>
       </div>
     </main>
