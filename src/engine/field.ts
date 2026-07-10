@@ -104,7 +104,17 @@ export function reconcile(
     const prevActive = field.active
     for (let i = plan.spawn.start; i < plan.spawn.end; i++) {
       if (prevActive > 0) {
-        copySlot(f, i % prevActive, i)
+        const src = i % prevActive
+        copySlot(f, src, i)
+        // Spawn at the source's HOME, not its live position: under GPU
+        // backends the CPU field's x/y are stale (the sim runs on the GPU),
+        // while homes are authoritative on every tier and equal the live
+        // position once the field has settled.
+        f.x[i] = f.homeX[src]!
+        f.y[i] = f.homeY[src]!
+        f.r[i] = f.homeR[src]!
+        f.g[i] = f.homeG[src]!
+        f.b[i] = f.homeB[src]!
       } else {
         f.x[i] = targets.homeX[i]!
         f.y[i] = targets.homeY[i]!
@@ -144,9 +154,10 @@ function collapseFaders(
   }
   const grid = buildTargetGrid(targets, targets.count)
   for (let i = active; i < count; i++) {
-    // Match from where the dot actually is so it collapses from its current
-    // spot; on settled fields this equals its home.
-    const j = nearestTarget(grid, f.x[i]!, f.y[i]!)
+    // Match from the fader's HOME (its slot in the outgoing layout), not its
+    // live position: live x/y are stale under GPU backends, and on settled
+    // fields home equals the live position anyway.
+    const j = nearestTarget(grid, f.homeX[i]!, f.homeY[i]!)
     f.homeX[i] = targets.homeX[j]!
     f.homeY[i] = targets.homeY[j]!
     f.homeR[i] = targets.homeR[j]!

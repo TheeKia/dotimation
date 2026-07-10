@@ -103,6 +103,59 @@ describe('reconcile — shrink collapses surplus toward survivors', () => {
   })
 })
 
+describe('reconcile — GPU-tier parity (morph from home, not live position)', () => {
+  test('growth spawns at the source slot pre-retarget home, not its live x/y', () => {
+    let f = reconcile(
+      createField(1),
+      targets([
+        [0, 0],
+        [10, 10],
+      ]),
+    )
+    // Simulate a GPU tier: the CPU x/y went stale (the sim runs on the GPU).
+    f.x[0] = 12345
+    f.y[0] = 12345
+    f = reconcile(
+      f,
+      targets([
+        [5, 5],
+        [6, 6],
+        [7, 7],
+        [8, 8],
+      ]),
+    )
+    // Slot 2 spawns from source slot 0: at its (old-layout) home (0,0), not
+    // at the stale live position 12345.
+    expect(f.x[2]).toBe(0)
+    expect(f.y[2]).toBe(0)
+    expect(f.alpha[2]).toBe(0)
+    expect(f.homeX[2]).toBe(7) // retargeted to the new layout afterwards
+  })
+
+  test('shrink matches faders to survivors by home, not stale live position', () => {
+    let f = reconcile(
+      createField(1),
+      coloredTargets([
+        { x: 0, y: 0, r: 1 },
+        { x: 50, y: 0, r: 1 },
+        { x: 100, y: 0, r: 2 }, // will become the fader
+      ]),
+    )
+    f.x[2] = 1 // stale live position near the LEFT survivor
+    f.y[2] = 0
+    f = reconcile(
+      f,
+      coloredTargets([
+        { x: 0, y: 0, r: 10 },
+        { x: 90, y: 0, r: 20 },
+      ]),
+    )
+    expect(f.active).toBe(2)
+    expect(f.homeX[2]).toBe(90) // matched by old HOME (100), not stale x (1)
+    expect(f.homeR[2]).toBe(20)
+  })
+})
+
 describe('reconcile — first load', () => {
   test('places actives at home with alpha 0, targetAlpha 1', () => {
     const f = reconcile(
