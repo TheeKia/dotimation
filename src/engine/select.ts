@@ -27,7 +27,8 @@ async function construct(
  * Constructs and initializes the best available backend, trying tiers in order
  * (GPU backends are dynamically imported / code-split) and falling through to
  * the next on any construct/init failure. Canvas2D is the always-present last
- * tier and is assumed not to throw.
+ * tier; if even it fails (canvas already bound to another context type), this
+ * throws rather than returning a dead backend.
  */
 export async function selectBackend(
   opts: SelectOptions,
@@ -57,7 +58,8 @@ export async function selectBackend(
       }
     }
   }
-  const be = createCanvas2DBackend({ dotSize: opts.dotSize })
-  await be.init(opts.canvas, opts.dpr)
-  return { backend: be, kind: 'canvas2d' }
+  // Every tier failed — including Canvas2D, which only happens when the canvas
+  // is already bound to a different context type. Surface it; a silent blank
+  // canvas is undebuggable.
+  throw new Error('dotimation: no rendering backend could initialize')
 }

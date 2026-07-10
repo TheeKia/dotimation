@@ -39,8 +39,13 @@ export function createCanvas2DBackend(opts: Canvas2DOptions): Backend {
       dpr = devicePixelRatio
       devW = canvas.width
       devH = canvas.height
-      ctx = canvas.getContext('2d')
-      if (ctx) ctx.imageSmoothingEnabled = false
+      // Throws instead of silently rendering nothing: getContext('2d') returns
+      // null when the canvas is already bound to another context type (a GPU
+      // tier acquired it, then failed mid-init).
+      const context = canvas.getContext('2d')
+      if (!context) throw new Error('canvas2d: 2d context unavailable')
+      ctx = context
+      ctx.imageSmoothingEnabled = false
       ensureBuffer()
     },
     uploadField(next): void {

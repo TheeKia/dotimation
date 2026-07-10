@@ -91,18 +91,30 @@ export default function Dotimation({
     const dpr = sizeCanvas(canvas, width, height)
 
     void (async () => {
-      const { backend: be, kind } = await selectBackend({
-        requested: backend,
-        dotSize: dotSizeRef.current,
-        canvas,
-        dpr,
-      })
-      if (cancelled) {
-        be.dispose()
+      let selected: Awaited<ReturnType<typeof selectBackend>>
+      try {
+        selected = await selectBackend({
+          requested: backend,
+          dotSize: dotSizeRef.current,
+          canvas,
+          dpr,
+        })
+      } catch (err) {
+        if (typeof console !== 'undefined') {
+          console.error(
+            '[dotimation] no rendering backend could initialize',
+            err,
+          )
+        }
         return
       }
+      if (cancelled) {
+        selected.backend.dispose()
+        return
+      }
+      const kind = selected.kind
       kindRef.current = kind
-      engine = createEngine({ backend: be, canvas, dpr, idle })
+      engine = createEngine({ backend: selected.backend, canvas, dpr, idle })
       engineRef.current = engine
       fieldRef.current = createField(1024)
       if (targetsRef.current) {
