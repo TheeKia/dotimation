@@ -7,10 +7,10 @@
   },
   "module": "./dist/index.js",
   "devDependencies": {
-    "@biomejs/biome": "^2.5.0",
+    "@biomejs/biome": "^2.5.3",
     "@types/bun": "^1.3.14",
     "@types/react": "^19.2.17",
-    "@webgpu/types": "^0.1.70",
+    "@webgpu/types": "^0.1.71",
     "bumpp": "^11.1.0",
     "bunup": "^0.16.32",
     "react": "^19.2.7",
