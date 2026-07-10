@@ -34,7 +34,7 @@ export function createWebGPUBackend(opts: WebGPUOptions): Backend {
   let context: GPUCanvasContext | null = null
   let canvasEl: HTMLCanvasElement | null = null
   let lastField: ParticleField | null = null
-  const disposed = false
+  let disposed = false
   let pipelines: Pipelines | null = null
   let buffers: GPUBuffers | null = null
   let devW = 0
@@ -290,15 +290,21 @@ export function createWebGPUBackend(opts: WebGPUOptions): Backend {
       renderUniformDirty = true
     },
     dispose(): void {
+      disposed = true
       if (buffers) disposeBuffers(buffers)
       pipelines?.simUniform.destroy()
       pipelines?.renderUniform.destroy()
+      // Frees the GPU device deterministically (GC is not prompt about it);
+      // triggers device.lost with reason 'destroyed', which watchLoss ignores.
+      device?.destroy()
       device = null
       context = null
       pipelines = null
       buffers = null
       simBindGroups = null
       renderBind = null
+      canvasEl = null
+      lastField = null
     },
   }
   return api

@@ -234,7 +234,16 @@ export function createWebGL2Backend(opts: WebGL2Options): Backend {
       if (gl && buffers) disposeBuffers(gl, buffers)
       sim?.dispose()
       draw?.dispose()
+      // Browsers cap live WebGL contexts and a GC'd canvas does not promptly
+      // free its context, so release it proactively — but only when the canvas
+      // left the DOM. While it is still connected (StrictMode remount, engine
+      // recreation) the next backend reuses this same context, and losing it
+      // here would brick that successor.
+      if (gl && canvasEl && !canvasEl.isConnected && !gl.isContextLost()) {
+        gl.getExtension('WEBGL_lose_context')?.loseContext()
+      }
       gl = null
+      canvasEl = null
       buffers = null
       sim = null
       draw = null

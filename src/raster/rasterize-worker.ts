@@ -4,11 +4,59 @@ import { WORKER_SOURCE } from './worker-source'
 interface Pending {
   resolve: (t: FieldTargets) => void
   reject: (e: unknown) => void
+  timer: ReturnType<typeof setTimeout>
 }
+
+// A stuck worker (or a message that never gets a reply) must reject rather
+// than hang the caller's promise forever — the caller falls back to the
+// main-thread rasterizer on rejection.
+const REQUEST_TIMEOUT_MS = 15_000
+// The worker is torn down after sitting idle so it doesn't hold a thread for
+// the page's lifetime; the next request just spins up a fresh one.
+const IDLE_TIMEOUT_MS = 10_000
 
 let worker: Worker | null = null
 let nextId = 1
 const pending = new Map<number, Pending>()
+let idleTimer: ReturnType<typeof setTimeout> | null = null
+
+function disarmIdleTimer(): void {
+  if (idleTimer) {
+    clearTimeout(idleTimer)
+    idleTimer = null
+  }
+}
+
+function armIdleTimer(): void {
+  disarmIdleTimer()
+  if (!worker || pending.size > 0) return
+  idleTimer = setTimeout(() => {
+    idleTimer = null
+    worker?.terminate()
+    worker = null
+  }, IDLE_TIMEOUT_MS)
+}
+
+/** Removes and returns the pending entry, clearing its timeout. */
+function take(id: number): Pending | undefined {
+  const p = pending.get(id)
+  if (p) {
+    pending.delete(id)
+    clearTimeout(p.timer)
+  }
+  return p
+}
+
+function failAll(err: Error): void {
+  for (const [, p] of pending) {
+    clearTimeout(p.timer)
+    p.reject(err)
+  }
+  pending.clear()
+  disarmIdleTimer()
+  worker?.terminate()
+  worker = null
+}
 
 function getWorker(): Worker | null {
   if (worker) return worker
@@ -29,18 +77,18 @@ function getWorker(): Worker | null {
         targets?: FieldTargets
         error?: string
       }
-      const p = pending.get(id)
+      const p = take(id)
       if (!p) return
-      pending.delete(id)
       if (error || !targets)
         p.reject(new Error(error ?? 'worker: empty result'))
       else p.resolve(targets)
+      armIdleTimer()
     }
-    worker.onerror = (): void => {
-      for (const [, p] of pending) p.reject(new Error('worker: error'))
-      pending.clear()
-      worker = null
-    }
+    worker.onerror = (): void => failAll(new Error('worker: error'))
+    // A reply that fails to deserialize carries no id, so every in-flight
+    // request must be failed over to the main-thread fallback.
+    worker.onmessageerror = (): void =>
+      failAll(new Error('worker: message deserialization failed'))
   } catch {
     worker = null
   }
@@ -64,9 +112,14 @@ export function rasterizeViaWorker(
 ): Promise<FieldTargets> {
   const w = getWorker()
   if (!w) return Promise.reject(new Error('worker: unavailable'))
+  disarmIdleTimer()
   const id = nextId++
   return new Promise<FieldTargets>((resolve, reject) => {
-    pending.set(id, { resolve, reject })
+    const timer = setTimeout(() => {
+      take(id)?.reject(new Error('worker: timed out'))
+      armIdleTimer()
+    }, REQUEST_TIMEOUT_MS)
+    pending.set(id, { resolve, reject, timer })
     w.postMessage({
       id,
       item,
