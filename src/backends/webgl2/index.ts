@@ -145,7 +145,6 @@ export function createWebGL2Backend(opts: WebGL2Options): Backend {
       ensureCapacity(field.capacity)
       const b = buffers
       const current = b.state[b.read]!
-      const other = b.state[b.read ^ 1]!
 
       // targets buffer: always full re-upload from the reconciled field.
       gl.bindBuffer(gl.ARRAY_BUFFER, b.targets)
@@ -162,41 +161,6 @@ export function createWebGL2Backend(opts: WebGL2Options): Backend {
           0,
           packStateInto(stateScratch, field, 0, field.count),
         )
-      } else if (plan.relocate) {
-        // Overlap clobber-safe rebuild into the OTHER buffer, then swap.
-        gl.bindBuffer(gl.COPY_READ_BUFFER, current)
-        gl.bindBuffer(gl.COPY_WRITE_BUFFER, other)
-        // keep overlap [0, overlap)
-        gl.copyBufferSubData(
-          gl.COPY_READ_BUFFER,
-          gl.COPY_WRITE_BUFFER,
-          0,
-          0,
-          plan.overlap * STATE_STRIDE_BYTES,
-        )
-        // relocate faders [from,from+len) -> [to,to+len)
-        gl.copyBufferSubData(
-          gl.COPY_READ_BUFFER,
-          gl.COPY_WRITE_BUFFER,
-          plan.relocate.from * STATE_STRIDE_BYTES,
-          plan.relocate.to * STATE_STRIDE_BYTES,
-          plan.relocate.len * STATE_STRIDE_BYTES,
-        )
-        // spawn new actives into the gap [start,end)
-        if (plan.spawn) {
-          gl.bindBuffer(gl.ARRAY_BUFFER, other)
-          gl.bufferSubData(
-            gl.ARRAY_BUFFER,
-            plan.spawn.start * STATE_STRIDE_BYTES,
-            packStateInto(
-              stateScratch,
-              field,
-              plan.spawn.start,
-              plan.spawn.end,
-            ),
-          )
-        }
-        b.read = (b.read ^ 1) as 0 | 1
       } else if (plan.spawn) {
         // Growth: write the new actives in place over slots [prevActive,end).
         // The live overlap [0,prevActive) is untouched; any superseded fader

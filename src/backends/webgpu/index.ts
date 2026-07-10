@@ -121,7 +121,6 @@ export function createWebGPUBackend(opts: WebGPUOptions): Backend {
       ensureCapacity(field.capacity)
       const b = buffers
       const current = b.state[b.read]!
-      const other = b.state[b.read ^ 1]!
 
       device.queue.writeBuffer(
         b.targets,
@@ -135,36 +134,6 @@ export function createWebGPUBackend(opts: WebGPUOptions): Backend {
           0,
           packStateInto(stateScratch, field, 0, field.count),
         )
-      } else if (plan.relocate) {
-        const enc = device.createCommandEncoder()
-        enc.copyBufferToBuffer(
-          current,
-          0,
-          other,
-          0,
-          plan.overlap * STATE_STRIDE_BYTES,
-        )
-        enc.copyBufferToBuffer(
-          current,
-          plan.relocate.from * STATE_STRIDE_BYTES,
-          other,
-          plan.relocate.to * STATE_STRIDE_BYTES,
-          plan.relocate.len * STATE_STRIDE_BYTES,
-        )
-        device.queue.submit([enc.finish()])
-        if (plan.spawn) {
-          device.queue.writeBuffer(
-            other,
-            plan.spawn.start * STATE_STRIDE_BYTES,
-            packStateInto(
-              stateScratch,
-              field,
-              plan.spawn.start,
-              plan.spawn.end,
-            ),
-          )
-        }
-        b.read = (b.read ^ 1) as 0 | 1
       } else if (plan.spawn) {
         device.queue.writeBuffer(
           current,

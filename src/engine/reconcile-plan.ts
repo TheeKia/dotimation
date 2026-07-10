@@ -4,8 +4,6 @@ export const TARGET_FLOATS = 6
 export interface FieldDelta {
   active: number
   count: number
-  overlap: number
-  relocate: { from: number; to: number; len: number } | null
   spawn: { start: number; end: number } | null
   firstLoad: boolean
 }
@@ -13,17 +11,17 @@ export interface FieldDelta {
 /**
  * Computes the structural morph from the previous layout to `newActive` targets,
  * matching `reconcile`'s slot semantics. Pure — drives both the CPU SoA mutation
- * (Canvas2D) and the GPU buffer ops (WebGL2).
+ * (Canvas2D) and the GPU buffer ops (WebGL2/WebGPU).
  *
  * Each transition keeps at most one generation of faders: only the live cluster
  * `[0, prevActive)` carries forward. Faders still in flight from an *earlier*
  * transition are superseded the moment a new one starts, so they are dropped
- * (left outside `count`) rather than carried/relocated. Otherwise leftovers from
- * the image two steps back stay visible at their old positions and bleed that
- * image into the current morph (the "parts of A surface during B->C" bug). The
- * plan therefore depends only on `prevActive` and `newActive` — never on the
- * accumulated `prevCount` — which also keeps it identical whether the previous
- * count came from the CPU field or a GPU backend that expires faders on its own.
+ * (left outside `count`). Otherwise leftovers from the image two steps back stay
+ * visible at their old positions and bleed that image into the current morph
+ * (the "parts of A surface during B->C" bug). The plan therefore depends only
+ * on `prevActive` and `newActive` — never on the accumulated `prevCount` —
+ * which also keeps it identical whether the previous count came from the CPU
+ * field or a GPU backend that expires faders on its own.
  */
 export function planReconcile(
   prevActive: number,
@@ -34,8 +32,6 @@ export function planReconcile(
     return {
       active: newActive,
       count: newActive,
-      overlap: 0,
-      relocate: null,
       spawn: { start: 0, end: newActive },
       firstLoad: true,
     }
@@ -47,8 +43,6 @@ export function planReconcile(
     return {
       active: newActive,
       count: prevActive,
-      overlap: newActive,
-      relocate: null,
       spawn: null,
       firstLoad: false,
     }
@@ -61,8 +55,6 @@ export function planReconcile(
   return {
     active: newActive,
     count: newActive,
-    overlap: prevActive,
-    relocate: null,
     spawn: { start: prevActive, end: newActive },
     firstLoad: false,
   }

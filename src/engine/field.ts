@@ -100,12 +100,6 @@ export function reconcile(
     return f
   }
 
-  if (plan.relocate) {
-    for (let j = plan.relocate.len - 1; j >= 0; j--) {
-      copySlot(f, plan.relocate.from + j, plan.relocate.to + j)
-    }
-  }
-
   if (plan.spawn) {
     const prevActive = field.active
     for (let i = plan.spawn.start; i < plan.spawn.end; i++) {

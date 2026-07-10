@@ -128,10 +128,9 @@ export function createSimProgram(gl: WebGL2RenderingContext): SimProgram {
       // every non-transform-feedback binding that may still point at a state
       // buffer. A buffer can't be a TF output and bound elsewhere at the same
       // time, or the driver rejects glDrawArrays with GL_INVALID_OPERATION and
-      // silently drops the sim write (frozen particles). uploadField's relocate
-      // path leaves BOTH ping-pong buffers bound to COPY_READ_BUFFER/
-      // COPY_WRITE_BUFFER (and ensureCapacity leaves one), so clear those too —
-      // not just ARRAY_BUFFER left bound by uploadField/draw.
+      // silently drops the sim write (frozen particles). ensureCapacity leaves
+      // buffers bound to COPY_READ_BUFFER/COPY_WRITE_BUFFER, so clear those
+      // too — not just ARRAY_BUFFER left bound by uploadField/draw.
       gl.bindBuffer(gl.ARRAY_BUFFER, null)
       gl.bindBuffer(gl.COPY_READ_BUFFER, null)
       gl.bindBuffer(gl.COPY_WRITE_BUFFER, null)
