@@ -20,13 +20,19 @@ const GENERIC_FAMILIES = new Set([
  * Whether `item` can be rasterized in a Web Worker without a font discrepancy.
  * Images always can. Text can only when its resolved family is a CSS generic
  * (workers have a separate font set, so custom fonts must stay on the main
- * thread where the document's fonts are available).
+ * thread where the document's fonts are available) and its fill is a plain
+ * color string.
  */
 export function isWorkerSafe(
   item: AnimateItem,
   defaultFontFamily: string,
 ): boolean {
   if (item.type === 'image') return true
+  // Gradient/pattern fills are bound to a main-thread context and are not
+  // structured-cloneable — postMessage would throw DataCloneError.
+  if (item.textColor !== undefined && typeof item.textColor !== 'string') {
+    return false
+  }
   const family = (item.fontFamily ?? defaultFontFamily).trim().toLowerCase()
   return GENERIC_FAMILIES.has(family)
 }

@@ -22,4 +22,19 @@ describe('isWorkerSafe', () => {
     expect(isWorkerSafe(txt('Inter'), 'sans-serif')).toBe(false)
     expect(isWorkerSafe(txt('"My Font"'), 'sans-serif')).toBe(false)
   })
+  test('gradient/pattern textColor is NOT worker-safe (not structured-cloneable)', () => {
+    const gradient = { addColorStop() {} } as unknown as CanvasGradient
+    const withGradient: AnimateItem = {
+      type: 'text',
+      data: 'hi',
+      textColor: gradient,
+    }
+    expect(isWorkerSafe(withGradient, 'sans-serif')).toBe(false)
+    const withString: AnimateItem = {
+      type: 'text',
+      data: 'hi',
+      textColor: '#fff',
+    }
+    expect(isWorkerSafe(withString, 'sans-serif')).toBe(true)
+  })
 })
