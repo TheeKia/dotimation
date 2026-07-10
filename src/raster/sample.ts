@@ -1,16 +1,10 @@
 import type { FieldTargets } from '@/types'
+import { createFastRand } from '../utils/prng'
 
-// Cheap xorshift32 PRNG for the candidate shuffle — uniform enough for a random
-// subset, and far cheaper than Math.random when sampling tens of thousands of
-// pixels. `rand` stays injectable below so tests are deterministic.
-let rngState = (Date.now() ^ 0x9e3779b9) >>> 0 || 1
-function fastRand(): number {
-  rngState ^= rngState << 13
-  rngState ^= rngState >>> 17
-  rngState ^= rngState << 5
-  rngState >>>= 0
-  return rngState / 0xffffffff
-}
+// Cheap seeded PRNG for the candidate shuffle — far cheaper than Math.random
+// when sampling tens of thousands of pixels. `rand` stays injectable below so
+// tests are deterministic.
+const fastRand = createFastRand(Date.now())
 
 /**
  * Samples a device-pixel RGBA buffer into FieldTargets. Pure and DOM-free.

@@ -1,18 +1,12 @@
 import { COLOR_RATE, JITTER_AMOUNT, OPACITY_RATE } from '@/engine/constants'
 import type { ParticleField } from '@/types'
+import { createFastRand } from '../../utils/prng'
 
-// Cheap xorshift32 PRNG for the per-particle jitter. Called once per particle
-// per step, so it sits squarely on the hot path where Math.random's cost adds
-// up; the exact sequence is cosmetic (a horizontal shimmer only). `rand` stays
+// Cheap seeded PRNG for the per-particle jitter. Called once per particle per
+// step, so it sits squarely on the hot path where Math.random's cost adds up;
+// the exact sequence is cosmetic (a horizontal shimmer only). `rand` stays
 // injectable below so tests remain deterministic.
-let rngState = (Date.now() ^ 0x9e3779b9) >>> 0 || 1
-function fastRand(): number {
-  rngState ^= rngState << 13
-  rngState ^= rngState >>> 17
-  rngState ^= rngState << 5
-  rngState >>>= 0
-  return rngState / 0xffffffff
-}
+const fastRand = createFastRand(Date.now())
 
 /**
  * Advances every slot one fixed step and compacts dead faders (targetAlpha 0
