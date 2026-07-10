@@ -6,6 +6,18 @@ import { createFastRand } from '../utils/prng'
 // tests are deterministic.
 const fastRand = createFastRand(Date.now())
 
+/** The zero-particle layout: what an empty item rasterizes to. */
+export function emptyFieldTargets(): FieldTargets {
+  return {
+    count: 0,
+    homeX: new Float32Array(0),
+    homeY: new Float32Array(0),
+    homeR: new Float32Array(0),
+    homeG: new Float32Array(0),
+    homeB: new Float32Array(0),
+  }
+}
+
 /**
  * Samples a device-pixel RGBA buffer into FieldTargets. Pure and DOM-free.
  * `rand` is injectable for deterministic tests (defaults to a fast PRNG).

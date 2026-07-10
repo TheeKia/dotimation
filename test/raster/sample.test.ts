@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { sampleTargets } from '@/raster/sample'
+import { emptyFieldTargets, sampleTargets } from '@/raster/sample'
 
 // 2x2 device image, dpr 1, step 1, one opaque red pixel at (1,0).
 function img(): Uint8ClampedArray {
@@ -110,5 +110,13 @@ describe('sampleTargets maxParticles', () => {
       expect(seen.has(key)).toBe(false)
       seen.add(key)
     }
+  })
+})
+
+describe('emptyFieldTargets', () => {
+  test('returns a zero-count layout with empty arrays', () => {
+    const t = emptyFieldTargets()
+    expect(t.count).toBe(0)
+    expect(t.homeX.length).toBe(0)
   })
 })

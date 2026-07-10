@@ -1,7 +1,7 @@
 import type { AnimateItem, FieldTargets } from '@/types'
 import { getCtx } from '@/utils/utils'
 import { drawImage, drawText } from './draw'
-import { sampleTargets } from './sample'
+import { emptyFieldTargets, sampleTargets } from './sample'
 
 export async function rasterize(
   width: number,
@@ -12,14 +12,7 @@ export async function rasterize(
   pointSpacingCss: number,
   maxParticles: number = Number.POSITIVE_INFINITY,
 ): Promise<FieldTargets> {
-  const empty: FieldTargets = {
-    count: 0,
-    homeX: new Float32Array(0),
-    homeY: new Float32Array(0),
-    homeR: new Float32Array(0),
-    homeG: new Float32Array(0),
-    homeB: new Float32Array(0),
-  }
+  const empty = emptyFieldTargets()
 
   const canvas = document.createElement('canvas')
   const ctx = getCtx(canvas, width, height)

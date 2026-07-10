@@ -1,0 +1,39 @@
+import type { AnimateItem } from '../types'
+
+/**
+ * Everything that affects rasterization output. `useFieldTargets` re-runs the
+ * rasterizer exactly when one of these changed — comparing ALL of them here
+ * (pure, unit-tested) is the fix for silently ignoring runtime changes to
+ * alpha/pointSpacingCss/maxParticles/defaultFontFamily.
+ */
+export interface RasterInputs {
+  item: AnimateItem
+  width: number
+  height: number
+  defaultFontFamily: string
+  alpha: number
+  pointSpacingCss: number
+  maxParticles: number
+  /** Bumped by the component when devicePixelRatio changes (see Dotimation). */
+  dprEpoch: number
+}
+
+function shallowEqual<T extends object>(a: T, b: T): boolean {
+  if (a === b) return true
+  const keysA = Object.keys(a) as (keyof T)[]
+  if (keysA.length !== Object.keys(b).length) return false
+  return keysA.every((k) => a[k] === b[k])
+}
+
+export function sameRasterInputs(a: RasterInputs, b: RasterInputs): boolean {
+  return (
+    shallowEqual(a.item, b.item) &&
+    a.width === b.width &&
+    a.height === b.height &&
+    a.defaultFontFamily === b.defaultFontFamily &&
+    a.alpha === b.alpha &&
+    a.pointSpacingCss === b.pointSpacingCss &&
+    a.maxParticles === b.maxParticles &&
+    a.dprEpoch === b.dprEpoch
+  )
+}

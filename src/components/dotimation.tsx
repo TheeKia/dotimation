@@ -78,6 +78,7 @@ export default function Dotimation({
     alpha,
     pointSpacingCss,
     maxParticles,
+    0, // dprEpoch — wired in the resize/DPR task
   )
 
   // Create / recreate the engine when canvas geometry or backend config changes.
