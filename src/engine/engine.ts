@@ -17,9 +17,8 @@ export interface Engine {
   /** Update the dot footprint live (read at draw time) without recreating the engine. */
   setDotSize(dotSize: number): void
   /**
-   * Resize in place without tearing down the engine. Unused in P0 (the React
-   * component recreates the engine on size change); wired for P1/P2 where GPU
-   * backends will resize live to avoid losing simulation state.
+   * Resize in place without tearing down the engine — the component calls this
+   * on width/height changes so simulation state survives across resizes.
    */
   resize(devW: number, devH: number): void
   dispose(): void

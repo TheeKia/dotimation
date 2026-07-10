@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useImperativeHandle, useRef } from 'react'
+import { useEffect, useImperativeHandle, useRef, useState } from 'react'
 import { createEngine, type Engine } from '@/engine/engine'
 import { createField, reconcile } from '@/engine/field'
 import { selectBackend } from '@/engine/select'
@@ -67,6 +67,13 @@ export default function Dotimation({
   // as a dependency (which would tear down the engine and reset the field).
   const dotSizeRef = useRef(dotSize)
   dotSizeRef.current = dotSize
+  // Latest size, readable by the creation effect without being a dependency —
+  // size changes are applied live via engine.resize, never by recreation.
+  const sizeRef = useRef({ width, height })
+  sizeRef.current = { width, height }
+  // Bumped when devicePixelRatio changes (zoom, monitor move) so the engine
+  // and rasterization re-key at the new density instead of rendering blurry.
+  const [dprEpoch, setDprEpoch] = useState(0)
 
   useImperativeHandle(canvasRef, () => ref.current!)
 
@@ -78,17 +85,35 @@ export default function Dotimation({
     alpha,
     pointSpacingCss,
     maxParticles,
-    0, // dprEpoch — wired in the resize/DPR task
+    dprEpoch,
   )
 
-  // Create / recreate the engine when canvas geometry or backend config changes.
+  // Watch for devicePixelRatio changes. The media query matches only the
+  // current ratio, so it must be re-armed after every change (hence dprEpoch
+  // in the deps).
+  // biome-ignore lint/correctness/useExhaustiveDependencies(dprEpoch): the effect reads devicePixelRatio, which changed exactly when dprEpoch was bumped — the dep re-arms the one-shot media query
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return
+    const mq = window.matchMedia(`(resolution: ${window.devicePixelRatio}dppx)`)
+    const onChange = (): void => setDprEpoch((e) => e + 1)
+    mq.addEventListener('change', onChange)
+    return () => mq.removeEventListener('change', onChange)
+  }, [dprEpoch])
+
+  // Create / recreate the engine when the backend config or device pixel
+  // ratio changes. Size changes do NOT recreate it (see the resize effect).
+  // biome-ignore lint/correctness/useExhaustiveDependencies(dprEpoch): sizeCanvas reads devicePixelRatio, which changed exactly when dprEpoch was bumped — the dep recreates the engine at the new density
   useEffect(() => {
     const canvas = ref.current
     if (!canvas) return
     let cancelled = false
     let engine: Engine | null = null
 
-    const dpr = sizeCanvas(canvas, width, height)
+    const dpr = sizeCanvas(
+      canvas,
+      sizeRef.current.width,
+      sizeRef.current.height,
+    )
 
     void (async () => {
       const constructedDotSize = dotSizeRef.current
@@ -113,8 +138,7 @@ export default function Dotimation({
         selected.backend.dispose()
         return
       }
-      const kind = selected.kind
-      kindRef.current = kind
+      kindRef.current = selected.kind
       engine = createEngine({ backend: selected.backend, canvas, dpr, idle })
       engineRef.current = engine
       // dotSize may have changed while the backend was initializing; the
@@ -122,13 +146,22 @@ export default function Dotimation({
       if (dotSizeRef.current !== constructedDotSize) {
         engine.setDotSize(dotSizeRef.current)
       }
+      // So may the size; the resize effect was likewise dropped.
+      const { width: w, height: h } = sizeRef.current
+      if (
+        canvas.width !== Math.round(w * dpr) ||
+        canvas.height !== Math.round(h * dpr)
+      ) {
+        sizeCanvas(canvas, w, h)
+        engine.resize(canvas.width, canvas.height)
+      }
       fieldRef.current = createField(1024)
       if (targetsRef.current) {
         fieldRef.current = reconcile(fieldRef.current, targetsRef.current)
         engine.setField(fieldRef.current)
       }
       onStatsRef.current?.({
-        backend: kind,
+        backend: selected.kind,
         particles: fieldRef.current.active,
       })
     })()
@@ -138,7 +171,17 @@ export default function Dotimation({
       engine?.dispose()
       engineRef.current = null
     }
-  }, [width, height, backend, idle])
+  }, [backend, idle, dprEpoch])
+
+  // Live resize: retune the backing store and notify the engine in place, so
+  // simulation state survives (the morph continues instead of restarting).
+  useEffect(() => {
+    const canvas = ref.current
+    const engine = engineRef.current
+    if (!canvas || !engine) return
+    sizeCanvas(canvas, width, height)
+    engine.resize(canvas.width, canvas.height)
+  }, [width, height])
 
   // dotSize only affects draw-time rendering, so push it to the live backend
   // instead of recreating the engine (which would reset every particle).
@@ -160,11 +203,11 @@ export default function Dotimation({
 
   return (
     // A canvas can only ever hold one context type ('2d' | 'webgl2' | 'webgpu')
-    // for its lifetime. Keying on `backend` remounts a fresh canvas when the
-    // backend changes, so the new backend can acquire its own context type
-    // instead of reusing a canvas already bound to a different one.
+    // for its lifetime, and a lost/disposed context cannot be reacquired on the
+    // same canvas. Keying on backend + dprEpoch remounts a fresh canvas whenever
+    // the engine is recreated, so each incarnation gets a clean slate.
     <canvas
-      key={backend}
+      key={`${backend}:${dprEpoch}`}
       ref={ref}
       className={className}
       width={width}
