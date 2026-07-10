@@ -91,11 +91,12 @@ export default function Dotimation({
     const dpr = sizeCanvas(canvas, width, height)
 
     void (async () => {
+      const constructedDotSize = dotSizeRef.current
       let selected: Awaited<ReturnType<typeof selectBackend>>
       try {
         selected = await selectBackend({
           requested: backend,
-          dotSize: dotSizeRef.current,
+          dotSize: constructedDotSize,
           canvas,
           dpr,
         })
@@ -116,6 +117,11 @@ export default function Dotimation({
       kindRef.current = kind
       engine = createEngine({ backend: selected.backend, canvas, dpr, idle })
       engineRef.current = engine
+      // dotSize may have changed while the backend was initializing; the
+      // setDotSize effect ran against a null engineRef and was dropped.
+      if (dotSizeRef.current !== constructedDotSize) {
+        engine.setDotSize(dotSizeRef.current)
+      }
       fieldRef.current = createField(1024)
       if (targetsRef.current) {
         fieldRef.current = reconcile(fieldRef.current, targetsRef.current)
