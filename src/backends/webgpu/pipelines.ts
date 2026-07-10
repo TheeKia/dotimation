@@ -1,13 +1,17 @@
+import { MAX_STEPS_PER_FRAME } from '@/engine/clock'
 import { STATE_FLOATS } from '@/engine/reconcile-plan'
 import { DRAW_WGSL } from './shaders/draw.wgsl'
 import { SIM_WGSL } from './shaders/sim.wgsl'
 
 const STATE_STRIDE = STATE_FLOATS * 4
+const SIM_U_BYTES = 8 * 4
 
 export interface Pipelines {
   compute: GPUComputePipeline
   render: GPURenderPipeline
   simUniform: GPUBuffer
+  /** Byte stride between per-step slices of simUniform (alignment-padded). */
+  simUniformStride: number
   renderUniform: GPUBuffer
   simBindGroup(
     inState: GPUBuffer,
@@ -25,8 +29,44 @@ export function createPipelines(
   const simModule = device.createShaderModule({ code: SIM_WGSL })
   const drawModule = device.createShaderModule({ code: DRAW_WGSL })
 
+  // The sim uniform holds one slice PER physics step of the frame, bound via
+  // dynamic offset, so each batched compute pass gets its own jitter seed —
+  // reusing one seed across passes applies identical jitter N times in the
+  // same direction (amplified shimmer vs. the other tiers).
+  const simUniformStride = Math.max(
+    device.limits.minUniformBufferOffsetAlignment,
+    SIM_U_BYTES,
+  )
+  const simLayout = device.createBindGroupLayout({
+    entries: [
+      {
+        binding: 0,
+        visibility: GPUShaderStage.COMPUTE,
+        buffer: {
+          type: 'uniform',
+          hasDynamicOffset: true,
+          minBindingSize: SIM_U_BYTES,
+        },
+      },
+      {
+        binding: 1,
+        visibility: GPUShaderStage.COMPUTE,
+        buffer: { type: 'read-only-storage' },
+      },
+      {
+        binding: 2,
+        visibility: GPUShaderStage.COMPUTE,
+        buffer: { type: 'storage' },
+      },
+      {
+        binding: 3,
+        visibility: GPUShaderStage.COMPUTE,
+        buffer: { type: 'read-only-storage' },
+      },
+    ],
+  })
   const compute = device.createComputePipeline({
-    layout: 'auto',
+    layout: device.createPipelineLayout({ bindGroupLayouts: [simLayout] }),
     compute: { module: simModule, entryPoint: 'main' },
   })
 
@@ -77,7 +117,7 @@ export function createPipelines(
   })
 
   const simUniform = device.createBuffer({
-    size: 8 * 4,
+    size: simUniformStride * MAX_STEPS_PER_FRAME,
     usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
   })
   const renderUniform = device.createBuffer({
@@ -89,13 +129,17 @@ export function createPipelines(
     compute,
     render,
     simUniform,
+    simUniformStride,
     renderUniform,
     device,
     simBindGroup(inState, outState, targets): GPUBindGroup {
       return device.createBindGroup({
-        layout: compute.getBindGroupLayout(0),
+        layout: simLayout,
         entries: [
-          { binding: 0, resource: { buffer: simUniform } },
+          {
+            binding: 0,
+            resource: { buffer: simUniform, offset: 0, size: SIM_U_BYTES },
+          },
           { binding: 1, resource: { buffer: inState } },
           { binding: 2, resource: { buffer: outState } },
           { binding: 3, resource: { buffer: targets } },

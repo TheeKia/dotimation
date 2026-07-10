@@ -1,4 +1,4 @@
-import { FIXED_DT } from '@/engine/clock'
+import { FIXED_DT, MAX_STEPS_PER_FRAME } from '@/engine/clock'
 import {
   COLOR_RATE,
   JITTER_AMOUNT,
@@ -174,7 +174,7 @@ export function createWebGPUBackend(opts: WebGPUOptions): Backend {
         return
       }
       const b = buffers
-      const steps = pendingSteps
+      const steps = Math.min(pendingSteps, MAX_STEPS_PER_FRAME)
       pendingSteps = 0
 
       if (steps > 0 && count > 0 && simBindGroups) {
@@ -184,9 +184,18 @@ export function createWebGPUBackend(opts: WebGPUOptions): Backend {
         simU[3] = COLOR_RATE
         simU[4] = OPACITY_RATE
         simU[5] = JITTER_AMOUNT
-        simU[6] = Math.random() * 1000
         simU[7] = count
-        device.queue.writeBuffer(pipelines.simUniform, 0, simU)
+        // One slice per step, each with a fresh jitter seed (matching the
+        // other tiers' per-step reseed); the passes select their slice via
+        // dynamic offset since all writeBuffers land before the one submit.
+        for (let s = 0; s < steps; s++) {
+          simU[6] = Math.random() * 1000
+          device.queue.writeBuffer(
+            pipelines.simUniform,
+            s * pipelines.simUniformStride,
+            simU,
+          )
+        }
       }
       if (renderUniformDirty) {
         renderU[0] = devW
@@ -206,7 +215,9 @@ export function createWebGPUBackend(opts: WebGPUOptions): Backend {
         for (let s = 0; s < steps; s++) {
           const sim = enc.beginComputePass()
           sim.setPipeline(pipelines.compute)
-          sim.setBindGroup(0, simBindGroups[r])
+          sim.setBindGroup(0, simBindGroups[r], [
+            s * pipelines.simUniformStride,
+          ])
           sim.dispatchWorkgroups(Math.ceil(count / 64))
           sim.end()
           r ^= 1
