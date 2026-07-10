@@ -66,7 +66,12 @@ export function createWebGL2Backend(opts: WebGL2Options): Backend {
     count = 0
     buildResources()
     lost = false
-    if (lastField) api.uploadField(lastField)
+    // Re-seed from the last field and paint once, so the canvas isn't blank
+    // until the engine happens to wake.
+    if (lastField) {
+      api.uploadField(lastField)
+      api.draw()
+    }
   }
 
   function buildResources(): void {

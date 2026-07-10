@@ -32,6 +32,9 @@ const STATE_STRIDE_BYTES = STATE_FLOATS * 4
 export function createWebGPUBackend(opts: WebGPUOptions): Backend {
   let device: GPUDevice | null = null
   let context: GPUCanvasContext | null = null
+  let canvasEl: HTMLCanvasElement | null = null
+  let lastField: ParticleField | null = null
+  const disposed = false
   let pipelines: Pipelines | null = null
   let buffers: GPUBuffers | null = null
   let devW = 0
@@ -61,6 +64,47 @@ export function createWebGPUBackend(opts: WebGPUOptions): Backend {
   // (all compute passes + the render pass) is one encoder / one submit.
   let pendingSteps = 0
   let stepDt = FIXED_DT
+
+  async function setup(canvas: HTMLCanvasElement): Promise<void> {
+    const s = await acquireGPU(canvas)
+    device = s.device
+    context = s.context
+    pipelines = createPipelines(device, s.format)
+    buffers = createBuffers(device, 1024)
+    rebuildBindGroups()
+    watchLoss(s.device)
+  }
+
+  function watchLoss(d: GPUDevice): void {
+    void d.lost.then((info) => {
+      if (disposed || device !== d) return
+      lost = true
+      // 'destroyed' is our own dispose(); anything else (GPU reset, driver
+      // update, OS sleep) is recoverable by re-acquiring a device.
+      if (info.reason === 'destroyed') return
+      void recover()
+    })
+  }
+
+  async function recover(): Promise<void> {
+    if (!canvasEl || disposed) return
+    try {
+      active = 0
+      count = 0
+      pendingSteps = 0
+      renderUniformDirty = true
+      await setup(canvasEl)
+      lost = false
+      // Re-seed from the last field and paint once, so the canvas isn't blank
+      // until the engine happens to wake.
+      if (lastField) {
+        api.uploadField(lastField)
+        api.draw()
+      }
+    } catch {
+      // A second failure means the GPU is really gone; stay lost.
+    }
+  }
 
   function rebuildBindGroups(): void {
     if (!device || !pipelines || !buffers) return
@@ -100,23 +144,17 @@ export function createWebGPUBackend(opts: WebGPUOptions): Backend {
     }
   }
 
-  return {
+  const api: Backend = {
     async init(canvas, devicePixelRatio): Promise<void> {
+      canvasEl = canvas
       dpr = devicePixelRatio
       devW = canvas.width
       devH = canvas.height
-      const setup = await acquireGPU(canvas)
-      device = setup.device
-      context = setup.context
-      pipelines = createPipelines(device, setup.format)
-      buffers = createBuffers(device, 1024)
-      rebuildBindGroups()
-      void device.lost.then(() => {
-        lost = true
-      })
+      await setup(canvas)
     },
     uploadField(field: ParticleField): void {
-      if (!device || !buffers) return
+      lastField = field
+      if (!device || !buffers || lost) return
       const plan = planReconcile(active, count, field.active)
       ensureCapacity(field.capacity)
       const b = buffers
@@ -263,4 +301,5 @@ export function createWebGPUBackend(opts: WebGPUOptions): Backend {
       renderBind = null
     },
   }
+  return api
 }
