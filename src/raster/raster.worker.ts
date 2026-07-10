@@ -1,7 +1,7 @@
 /// <reference lib="webworker" />
 import type { AnimateItem, FieldTargets } from '@/types'
 import { drawImage, drawText } from './draw'
-import { sampleTargets } from './sample'
+import { invertPixels, sampleTargets } from './sample'
 
 interface RasterRequest {
   id: number
@@ -34,6 +34,7 @@ async function run(req: RasterRequest): Promise<FieldTargets> {
   }
 
   const img = ctx.getImageData(0, 0, w, h)
+  if (req.item.type === 'image' && req.item.invert) invertPixels(img.data)
   return sampleTargets(
     img.data,
     w,

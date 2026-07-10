@@ -67,12 +67,7 @@ export function drawImage(
   const sh = imgH * scale
   const x = (width - sw) / 2
   const y = (height - sh) / 2
-  if (item.invert) {
-    ctx.save()
-    ctx.filter = 'invert(1)'
-    ctx.drawImage(image, x, y, sw, sh)
-    ctx.restore()
-  } else {
-    ctx.drawImage(image, x, y, sw, sh)
-  }
+  // `invert` is applied by the caller on the sampled pixel buffer
+  // (invertPixels), not via ctx.filter, which not every context supports.
+  ctx.drawImage(image, x, y, sw, sh)
 }

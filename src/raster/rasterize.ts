@@ -1,7 +1,7 @@
 import type { AnimateItem, FieldTargets } from '@/types'
 import { getCtx } from '@/utils/utils'
 import { drawImage, drawText } from './draw'
-import { emptyFieldTargets, sampleTargets } from './sample'
+import { emptyFieldTargets, invertPixels, sampleTargets } from './sample'
 
 export async function rasterize(
   width: number,
@@ -34,6 +34,7 @@ export async function rasterize(
   const devW = canvas.width
   const devH = canvas.height
   const img = ctx.getImageData(0, 0, devW, devH)
+  if (item.type === 'image' && item.invert) invertPixels(img.data)
   return sampleTargets(
     img.data,
     devW,

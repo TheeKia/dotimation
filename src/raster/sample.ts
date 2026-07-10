@@ -6,6 +6,20 @@ import { createFastRand } from '../utils/prng'
 // tests are deterministic.
 const fastRand = createFastRand(Date.now())
 
+/**
+ * In-place RGB inversion (alpha untouched). Replaces ctx.filter = 'invert(1)',
+ * which is silently ignored where unsupported (notably OffscreenCanvas in some
+ * Safari versions) — the pixel walk is deterministic everywhere and the
+ * buffer is already in hand for sampling.
+ */
+export function invertPixels(pixels: Uint8ClampedArray): void {
+  for (let i = 0; i < pixels.length; i += 4) {
+    pixels[i] = 255 - pixels[i]!
+    pixels[i + 1] = 255 - pixels[i + 1]!
+    pixels[i + 2] = 255 - pixels[i + 2]!
+  }
+}
+
 /** The zero-particle layout: what an empty item rasterizes to. */
 export function emptyFieldTargets(): FieldTargets {
   return {

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { emptyFieldTargets, sampleTargets } from '@/raster/sample'
+import { emptyFieldTargets, invertPixels, sampleTargets } from '@/raster/sample'
 
 // 2x2 device image, dpr 1, step 1, one opaque red pixel at (1,0).
 function img(): Uint8ClampedArray {
@@ -118,5 +118,13 @@ describe('emptyFieldTargets', () => {
     const t = emptyFieldTargets()
     expect(t.count).toBe(0)
     expect(t.homeX.length).toBe(0)
+  })
+})
+
+describe('invertPixels', () => {
+  test('inverts RGB in place and preserves alpha', () => {
+    const px = new Uint8ClampedArray([0, 128, 255, 200, 10, 20, 30, 0])
+    invertPixels(px)
+    expect([...px]).toEqual([255, 127, 0, 200, 245, 235, 225, 0])
   })
 })
