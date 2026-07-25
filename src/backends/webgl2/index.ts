@@ -1,10 +1,4 @@
-import {
-  COLOR_RATE,
-  JITTER_AMOUNT,
-  OPACITY_RATE,
-  SETTLE_TIME,
-  ZETA,
-} from '@/engine/constants'
+import { COLOR_RATE, OPACITY_RATE, SETTLE_TIME, ZETA } from '@/engine/constants'
 import { planReconcile } from '@/engine/reconcile-plan'
 import { tuneSpring } from '@/engine/settle'
 import type { Backend, ParticleField } from '@/types'
@@ -24,6 +18,8 @@ import { createSimProgram, type SimProgram } from './program-sim'
 
 export interface WebGL2Options {
   dotSize: number
+  /** Shimmer amplitude in px per step (0 disables, e.g. reduced motion). */
+  jitter: number
 }
 
 export function createWebGL2Backend(opts: WebGL2Options): Backend {
@@ -40,6 +36,7 @@ export function createWebGL2Backend(opts: WebGL2Options): Backend {
   let lost = false
   let lastUpload = 0
   let dotSize = opts.dotSize
+  const jitter = opts.jitter
   let lastField: ParticleField | null = null
   let stateScratch = new Float32Array(1024 * STATE_FLOATS)
   let targetScratch = new Float32Array(1024 * TARGET_FLOATS)
@@ -132,7 +129,7 @@ export function createWebGL2Backend(opts: WebGL2Options): Backend {
 
   const api: Backend = {
     init,
-    uploadField(field: ParticleField): void {
+    uploadField(field: ParticleField, full = false): void {
       if (!gl || !buffers) return
       lastField = field
       const plan = planReconcile(active, count, field.active) // field.active == new targets.count
@@ -147,6 +144,21 @@ export function createWebGL2Backend(opts: WebGL2Options): Backend {
         0,
         packTargetsInto(targetScratch, field, field.count),
       )
+
+      if (full) {
+        // The CPU field was mutated outside reconcile (e.g. snapField), so the
+        // plan's diff doesn't describe it — re-upload the whole live state.
+        gl.bindBuffer(gl.ARRAY_BUFFER, current)
+        gl.bufferSubData(
+          gl.ARRAY_BUFFER,
+          0,
+          packStateInto(stateScratch, field, 0, field.count),
+        )
+        active = field.active
+        count = field.count
+        lastUpload = performance.now()
+        return
+      }
 
       if (plan.firstLoad) {
         gl.bindBuffer(gl.ARRAY_BUFFER, current)
@@ -192,7 +204,7 @@ export function createWebGL2Backend(opts: WebGL2Options): Backend {
         c,
         colorRate: COLOR_RATE,
         opacityRate: OPACITY_RATE,
-        jitter: JITTER_AMOUNT,
+        jitter,
         seed: (Math.random() * 0x100000000) >>> 0,
       })
       b.read = (b.read ^ 1) as 0 | 1

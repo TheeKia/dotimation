@@ -133,6 +133,43 @@ export function reconcile(
 }
 
 /**
+ * Completes the current morph instantly: every slot lands at its home with its
+ * home color, velocities zeroed and alpha at its target; fully-faded faders are
+ * dropped. Used for prefers-reduced-motion — content changes become opacity
+ * fades with no movement. The result satisfies isFieldSettled.
+ */
+export function snapField(field: ParticleField): void {
+  const {
+    x,
+    y,
+    vx,
+    vy,
+    homeX,
+    homeY,
+    r,
+    g,
+    b,
+    homeR,
+    homeG,
+    homeB,
+    alpha,
+    targetAlpha,
+  } = field
+  for (let i = 0; i < field.count; i++) {
+    x[i] = homeX[i]!
+    y[i] = homeY[i]!
+    vx[i] = 0
+    vy[i] = 0
+    r[i] = homeR[i]!
+    g[i] = homeG[i]!
+    b[i] = homeB[i]!
+    alpha[i] = targetAlpha[i]!
+  }
+  // Faders snapped to alpha 0 are invisible; drop them from the tail.
+  field.count = field.active
+}
+
+/**
  * Sends every fader [active, count) home to the nearest surviving target so it
  * drifts into the new layout while fading, instead of dissolving in place at the
  * old image's position. Falls back to fading in place when the new image is

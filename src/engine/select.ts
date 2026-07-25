@@ -6,6 +6,8 @@ import { type ConcreteBackend, resolveBackendOrder } from './cascade'
 export interface SelectOptions {
   requested: BackendKind
   dotSize: number
+  /** Shimmer amplitude in px per step (0 disables, e.g. reduced motion). */
+  jitter: number
   canvas: HTMLCanvasElement
   dpr: number
 }
@@ -13,14 +15,21 @@ export interface SelectOptions {
 async function construct(
   kind: ConcreteBackend,
   dotSize: number,
+  jitter: number,
 ): Promise<Backend> {
   if (kind === 'webgpu') {
-    return (await import('@/backends/webgpu')).createWebGPUBackend({ dotSize })
+    return (await import('@/backends/webgpu')).createWebGPUBackend({
+      dotSize,
+      jitter,
+    })
   }
   if (kind === 'webgl2') {
-    return (await import('@/backends/webgl2')).createWebGL2Backend({ dotSize })
+    return (await import('@/backends/webgl2')).createWebGL2Backend({
+      dotSize,
+      jitter,
+    })
   }
-  return createCanvas2DBackend({ dotSize })
+  return createCanvas2DBackend({ dotSize, jitter })
 }
 
 /**
@@ -44,7 +53,7 @@ export async function selectBackend(
   for (const kind of order) {
     let be: Backend | undefined
     try {
-      be = await construct(kind, opts.dotSize)
+      be = await construct(kind, opts.dotSize, opts.jitter)
       await be.init(opts.canvas, opts.dpr)
       return { backend: be, kind }
     } catch (err) {

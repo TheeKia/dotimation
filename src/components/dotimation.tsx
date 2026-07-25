@@ -7,10 +7,12 @@ import {
   useRef,
   useState,
 } from 'react'
+import { JITTER_AMOUNT } from '@/engine/constants'
 import { createEngine, type Engine } from '@/engine/engine'
-import { createField, reconcile } from '@/engine/field'
+import { createField, reconcile, snapField } from '@/engine/field'
 import { selectBackend } from '@/engine/select'
 import { useFieldTargets } from '@/hooks/use-field-targets'
+import { useReducedMotion } from '@/hooks/use-reduced-motion'
 import type {
   AnimateItem,
   BackendKind,
@@ -85,6 +87,12 @@ export default function Dotimation({
   // Bumped when devicePixelRatio changes (zoom, monitor move) so the engine
   // and rasterization re-key at the new density instead of rendering blurry.
   const [dprEpoch, setDprEpoch] = useState(0)
+  // Under reduced motion, morphs snap to their end state (opacity-only
+  // changes) and the shimmer jitter is disabled. A live flip recreates the
+  // engine (rare OS-level event) so the jitter setting takes effect.
+  const reducedMotion = useReducedMotion()
+  const reducedMotionRef = useRef(reducedMotion)
+  reducedMotionRef.current = reducedMotion
 
   useImperativeHandle(canvasRef, () => ref.current!)
 
@@ -117,6 +125,7 @@ export default function Dotimation({
   // size on every resize). Also notifies the live engine, in place, so
   // simulation state survives (the morph continues instead of restarting).
   // biome-ignore lint/correctness/useExhaustiveDependencies(backend): a backend change remounts the canvas (see the key), and the fresh element must be sized again
+  // biome-ignore lint/correctness/useExhaustiveDependencies(reducedMotion): same — it participates in the canvas key
   // biome-ignore lint/correctness/useExhaustiveDependencies(dprEpoch): sizeCanvas reads devicePixelRatio, which changed exactly when dprEpoch was bumped
   useLayoutEffect(() => {
     const canvas = ref.current
@@ -127,7 +136,7 @@ export default function Dotimation({
     if (canvas.width !== prevW || canvas.height !== prevH) {
       engineRef.current?.resize(canvas.width, canvas.height)
     }
-  }, [width, height, backend, dprEpoch])
+  }, [width, height, backend, dprEpoch, reducedMotion])
 
   // Create / recreate the engine when the backend config or device pixel
   // ratio changes. Size changes do NOT recreate it (see the resize effect).
@@ -152,6 +161,7 @@ export default function Dotimation({
         selected = await selectBackend({
           requested: backend,
           dotSize: constructedDotSize,
+          jitter: reducedMotion ? 0 : JITTER_AMOUNT,
           canvas,
           dpr,
         })
@@ -197,7 +207,8 @@ export default function Dotimation({
       fieldRef.current = createField(1024)
       if (targetsRef.current) {
         fieldRef.current = reconcile(fieldRef.current, targetsRef.current)
-        engine.setField(fieldRef.current)
+        if (reducedMotion) snapField(fieldRef.current)
+        engine.setField(fieldRef.current, reducedMotion)
       }
       onStatsRef.current?.({
         backend: selected.kind,
@@ -210,7 +221,7 @@ export default function Dotimation({
       engine?.dispose()
       engineRef.current = null
     }
-  }, [backend, dprEpoch])
+  }, [backend, dprEpoch, reducedMotion])
 
   // dotSize only affects draw-time rendering, so push it to the live backend
   // instead of recreating the engine (which would reset every particle).
@@ -228,7 +239,11 @@ export default function Dotimation({
     targetsRef.current = targets
     if (!targets || !engineRef.current) return
     fieldRef.current = reconcile(fieldRef.current, targets)
-    engineRef.current.setField(fieldRef.current)
+    // Reduced motion: complete the morph instantly (opacity-only change) and
+    // force a full GPU re-upload since the field changed outside reconcile.
+    const snap = reducedMotionRef.current
+    if (snap) snapField(fieldRef.current)
+    engineRef.current.setField(fieldRef.current, snap)
     onStatsRef.current?.({
       backend: kindRef.current,
       particles: fieldRef.current.active,
@@ -241,7 +256,7 @@ export default function Dotimation({
     // same canvas. Keying on backend + dprEpoch remounts a fresh canvas whenever
     // the engine is recreated, so each incarnation gets a clean slate.
     <canvas
-      key={`${backend}:${dprEpoch}`}
+      key={`${backend}:${dprEpoch}:${reducedMotion ? 'rm' : 'm'}`}
       ref={ref}
       className={className}
       style={style}

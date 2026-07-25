@@ -15,6 +15,7 @@ const fastRand = createFastRand(Date.now())
  * satisfies the same convergence predicate as isFieldSettled — evaluated
  * inline so the engine's per-frame settled() check is O(1) instead of a
  * second O(count) pass. `rand` is injectable for deterministic tests.
+ * `jitterAmount` overrides the shimmer amplitude (0 under reduced motion).
  */
 export function stepField(
   field: ParticleField,
@@ -22,6 +23,7 @@ export function stepField(
   k: number,
   c: number,
   rand: () => number = fastRand,
+  jitterAmount: number = JITTER_AMOUNT,
 ): boolean {
   const {
     x,
@@ -55,7 +57,7 @@ export function stepField(
     // Jitter is applied to X only — a deliberate horizontal shimmer carried
     // over from the original engine. Do not add Y jitter without intent: it
     // would change the established visual look.
-    x[i]! += vx[i]! * dt + (rand() - 0.5) * JITTER_AMOUNT
+    x[i]! += vx[i]! * dt + (rand() - 0.5) * jitterAmount
     y[i]! += vy[i]! * dt
     r[i] = r[i]! + (homeR[i]! - r[i]!) * colorFactor
     g[i] = g[i]! + (homeG[i]! - g[i]!) * colorFactor

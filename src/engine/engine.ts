@@ -13,7 +13,8 @@ export interface EngineOptions {
 const SETTLE_SECONDS = computeSettleDuration(SETTLE_TIME, OPACITY_RATE)
 
 export interface Engine {
-  setField(field: ParticleField): void
+  /** Push a reconciled field; `full` is forwarded to Backend.uploadField. */
+  setField(field: ParticleField, full?: boolean): void
   /** Update the dot footprint live (read at draw time) without recreating the engine. */
   setDotSize(dotSize: number): void
   /** Switch idle behavior live (read by the loop each frame) without recreating the engine. */
@@ -89,8 +90,8 @@ export function createEngine(opts: EngineOptions): Engine {
   io?.observe(canvas)
 
   return {
-    setField(field): void {
-      backend.uploadField(field)
+    setField(field, full): void {
+      backend.uploadField(field, full)
       wake()
     },
     setDotSize(dotSize): void {

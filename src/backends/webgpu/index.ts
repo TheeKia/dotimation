@@ -1,11 +1,5 @@
 import { FIXED_DT, MAX_STEPS_PER_FRAME } from '@/engine/clock'
-import {
-  COLOR_RATE,
-  JITTER_AMOUNT,
-  OPACITY_RATE,
-  SETTLE_TIME,
-  ZETA,
-} from '@/engine/constants'
+import { COLOR_RATE, OPACITY_RATE, SETTLE_TIME, ZETA } from '@/engine/constants'
 import { planReconcile } from '@/engine/reconcile-plan'
 import { tuneSpring } from '@/engine/settle'
 import type { Backend, ParticleField } from '@/types'
@@ -24,6 +18,8 @@ import { createPipelines, type Pipelines } from './pipelines'
 
 export interface WebGPUOptions {
   dotSize: number
+  /** Shimmer amplitude in px per step (0 disables, e.g. reduced motion). */
+  jitter: number
 }
 
 export function createWebGPUBackend(opts: WebGPUOptions): Backend {
@@ -42,6 +38,7 @@ export function createWebGPUBackend(opts: WebGPUOptions): Backend {
   let lost = false
   let lastUpload = 0
   let dotSize = opts.dotSize
+  const jitter = opts.jitter
   let stateScratch = new Float32Array(1024 * STATE_FLOATS)
   let targetScratch = new Float32Array(1024 * TARGET_FLOATS)
   const { k, c } = tuneSpring({ settleTime: SETTLE_TIME, zeta: ZETA })
@@ -148,7 +145,7 @@ export function createWebGPUBackend(opts: WebGPUOptions): Backend {
       devH = canvas.height
       await setup(canvas)
     },
-    uploadField(field: ParticleField): void {
+    uploadField(field: ParticleField, full = false): void {
       lastField = field
       if (!device || !buffers || lost) return
       const plan = planReconcile(active, count, field.active)
@@ -161,6 +158,20 @@ export function createWebGPUBackend(opts: WebGPUOptions): Backend {
         0,
         packTargetsInto(targetScratch, field, field.count),
       )
+
+      if (full) {
+        // The CPU field was mutated outside reconcile (e.g. snapField), so the
+        // plan's diff doesn't describe it — re-upload the whole live state.
+        device.queue.writeBuffer(
+          current,
+          0,
+          packStateInto(stateScratch, field, 0, field.count),
+        )
+        active = field.active
+        count = field.count
+        lastUpload = performance.now()
+        return
+      }
 
       if (plan.firstLoad) {
         device.queue.writeBuffer(
@@ -217,7 +228,7 @@ export function createWebGPUBackend(opts: WebGPUOptions): Backend {
         simU[2] = c
         simU[3] = COLOR_RATE
         simU[4] = OPACITY_RATE
-        simU[5] = JITTER_AMOUNT
+        simU[5] = jitter
         simU[7] = count
         // One slice per step, each with a fresh jitter seed (matching the
         // other tiers' per-step reseed); the passes select their slice via

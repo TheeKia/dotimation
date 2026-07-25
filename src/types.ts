@@ -62,7 +62,13 @@ export interface DotimationStats {
 
 export interface Backend {
   init(canvas: HTMLCanvasElement, dpr: number): Promise<void> | void
-  uploadField(field: ParticleField): void
+  /**
+   * Push the reconciled CPU field. `full` forces a complete state re-upload
+   * (GPU tiers adopt field.active/count verbatim instead of diffing via
+   * planReconcile) — used when the CPU field was mutated outside reconcile,
+   * e.g. snapField under prefers-reduced-motion.
+   */
+  uploadField(field: ParticleField, full?: boolean): void
   /** Update the dot footprint (in CSS px). Read at draw time; no re-init needed. */
   setDotSize(dotSize: number): void
   step(dt: number): void
