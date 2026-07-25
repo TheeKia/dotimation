@@ -1,33 +1,26 @@
 import { FIXED_DT, MAX_STEPS_PER_FRAME } from '@/engine/clock'
-import {
-  COLOR_RATE,
-  JITTER_AMOUNT,
-  OPACITY_RATE,
-  SETTLE_TIME,
-  ZETA,
-} from '@/engine/constants'
-import {
-  planReconcile,
-  STATE_FLOATS,
-  TARGET_FLOATS,
-} from '@/engine/reconcile-plan'
+import { COLOR_RATE, OPACITY_RATE, SETTLE_TIME, ZETA } from '@/engine/constants'
+import { planReconcile } from '@/engine/reconcile-plan'
 import { tuneSpring } from '@/engine/settle'
 import type { Backend, ParticleField } from '@/types'
 import {
-  createBuffers,
-  disposeBuffers,
-  type GPUBuffers,
+  ensureScratch,
+  FADE_DURATION_MS,
   packStateInto,
   packTargetsInto,
-} from './buffers'
+  STATE_FLOATS,
+  STATE_STRIDE_BYTES,
+  TARGET_FLOATS,
+} from '../gpu-shared'
+import { createBuffers, disposeBuffers, type GPUBuffers } from './buffers'
 import { acquireGPU } from './device'
 import { createPipelines, type Pipelines } from './pipelines'
 
 export interface WebGPUOptions {
   dotSize: number
+  /** Shimmer amplitude in px per step (0 disables, e.g. reduced motion). */
+  jitter: number
 }
-
-const STATE_STRIDE_BYTES = STATE_FLOATS * 4
 
 export function createWebGPUBackend(opts: WebGPUOptions): Backend {
   let device: GPUDevice | null = null
@@ -45,17 +38,21 @@ export function createWebGPUBackend(opts: WebGPUOptions): Backend {
   let lost = false
   let lastUpload = 0
   let dotSize = opts.dotSize
+  const jitter = opts.jitter
   let stateScratch = new Float32Array(1024 * STATE_FLOATS)
   let targetScratch = new Float32Array(1024 * TARGET_FLOATS)
   const { k, c } = tuneSpring({ settleTime: SETTLE_TIME, zeta: ZETA })
-  const FADE_DURATION_MS = (1 / OPACITY_RATE + 0.15) * 1000
 
   // Bind groups and uniform staging are stable across frames, so they are
   // created once (and rebuilt only when the buffers are recreated) instead of
   // per step/draw. simBindGroups is indexed by the ping-pong read index.
   let simBindGroups: [GPUBindGroup, GPUBindGroup] | null = null
   let renderBind: GPUBindGroup | null = null
-  const simU = new Float32Array(8)
+  // One backing buffer, two views: slot 6 (the jitter seed) is a u32 in the
+  // WGSL Params struct, the rest are f32.
+  const simUBytes = new ArrayBuffer(8 * 4)
+  const simU = new Float32Array(simUBytes)
+  const simUu32 = new Uint32Array(simUBytes)
   const renderU = new Float32Array(4)
   // The render uniforms (devW/devH/dpr/dotSize) change only on resize/dotSize,
   // so the GPU write is skipped on frames where they are unchanged.
@@ -136,12 +133,8 @@ export function createWebGPUBackend(opts: WebGPUOptions): Backend {
     buffers = next
     // The cached bind groups referenced the disposed buffers; rebuild them.
     rebuildBindGroups()
-    if (stateScratch.length < next.capacity * STATE_FLOATS) {
-      stateScratch = new Float32Array(next.capacity * STATE_FLOATS)
-    }
-    if (targetScratch.length < next.capacity * TARGET_FLOATS) {
-      targetScratch = new Float32Array(next.capacity * TARGET_FLOATS)
-    }
+    stateScratch = ensureScratch(stateScratch, next.capacity * STATE_FLOATS)
+    targetScratch = ensureScratch(targetScratch, next.capacity * TARGET_FLOATS)
   }
 
   const api: Backend = {
@@ -152,7 +145,7 @@ export function createWebGPUBackend(opts: WebGPUOptions): Backend {
       devH = canvas.height
       await setup(canvas)
     },
-    uploadField(field: ParticleField): void {
+    uploadField(field: ParticleField, full = false): void {
       lastField = field
       if (!device || !buffers || lost) return
       const plan = planReconcile(active, count, field.active)
@@ -165,6 +158,20 @@ export function createWebGPUBackend(opts: WebGPUOptions): Backend {
         0,
         packTargetsInto(targetScratch, field, field.count),
       )
+
+      if (full) {
+        // The CPU field was mutated outside reconcile (e.g. snapField), so the
+        // plan's diff doesn't describe it — re-upload the whole live state.
+        device.queue.writeBuffer(
+          current,
+          0,
+          packStateInto(stateScratch, field, 0, field.count),
+        )
+        active = field.active
+        count = field.count
+        lastUpload = performance.now()
+        return
+      }
 
       if (plan.firstLoad) {
         device.queue.writeBuffer(
@@ -221,13 +228,13 @@ export function createWebGPUBackend(opts: WebGPUOptions): Backend {
         simU[2] = c
         simU[3] = COLOR_RATE
         simU[4] = OPACITY_RATE
-        simU[5] = JITTER_AMOUNT
+        simU[5] = jitter
         simU[7] = count
         // One slice per step, each with a fresh jitter seed (matching the
         // other tiers' per-step reseed); the passes select their slice via
         // dynamic offset since all writeBuffers land before the one submit.
         for (let s = 0; s < steps; s++) {
-          simU[6] = Math.random() * 1000
+          simUu32[6] = (Math.random() * 0x100000000) >>> 0
           device.queue.writeBuffer(
             pipelines.simUniform,
             s * pipelines.simUniformStride,

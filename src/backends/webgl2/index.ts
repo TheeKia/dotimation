@@ -1,33 +1,26 @@
-import {
-  COLOR_RATE,
-  JITTER_AMOUNT,
-  OPACITY_RATE,
-  SETTLE_TIME,
-  ZETA,
-} from '@/engine/constants'
-import {
-  planReconcile,
-  STATE_FLOATS,
-  TARGET_FLOATS,
-} from '@/engine/reconcile-plan'
+import { COLOR_RATE, OPACITY_RATE, SETTLE_TIME, ZETA } from '@/engine/constants'
+import { planReconcile } from '@/engine/reconcile-plan'
 import { tuneSpring } from '@/engine/settle'
 import type { Backend, ParticleField } from '@/types'
 import {
-  createBuffers,
-  disposeBuffers,
-  type GLBuffers,
+  ensureScratch,
+  FADE_DURATION_MS,
   packStateInto,
   packTargetsInto,
-} from './buffers'
+  STATE_FLOATS,
+  STATE_STRIDE_BYTES,
+  TARGET_FLOATS,
+} from '../gpu-shared'
+import { createBuffers, disposeBuffers, type GLBuffers } from './buffers'
 import { getGL } from './gl'
 import { createDrawProgram, type DrawProgram } from './program-draw'
 import { createSimProgram, type SimProgram } from './program-sim'
 
 export interface WebGL2Options {
   dotSize: number
+  /** Shimmer amplitude in px per step (0 disables, e.g. reduced motion). */
+  jitter: number
 }
-
-const STATE_STRIDE_BYTES = STATE_FLOATS * 4
 
 export function createWebGL2Backend(opts: WebGL2Options): Backend {
   let gl: WebGL2RenderingContext | null = null
@@ -43,14 +36,11 @@ export function createWebGL2Backend(opts: WebGL2Options): Backend {
   let lost = false
   let lastUpload = 0
   let dotSize = opts.dotSize
+  const jitter = opts.jitter
   let lastField: ParticleField | null = null
   let stateScratch = new Float32Array(1024 * STATE_FLOATS)
   let targetScratch = new Float32Array(1024 * TARGET_FLOATS)
   const { k, c } = tuneSpring({ settleTime: SETTLE_TIME, zeta: ZETA })
-  // Faders fade out at OPACITY_RATE; after this long they are invisible and the
-  // tail can be dropped. The Canvas2D backend compacts faders in stepField; the
-  // GPU sim doesn't change count, so we expire them here by elapsed time.
-  const FADE_DURATION_MS = (1 / OPACITY_RATE + 0.15) * 1000
 
   const onLost = (e: Event): void => {
     e.preventDefault()
@@ -118,12 +108,8 @@ export function createWebGL2Backend(opts: WebGL2Options): Backend {
     // The old VAOs referenced the disposed buffers; rebind them to the new ones.
     sim?.setBuffers(next.state[0], next.state[1], next.targets)
     draw?.setBuffers(next.state[0], next.state[1], next.quad)
-    if (stateScratch.length < next.capacity * STATE_FLOATS) {
-      stateScratch = new Float32Array(next.capacity * STATE_FLOATS)
-    }
-    if (targetScratch.length < next.capacity * TARGET_FLOATS) {
-      targetScratch = new Float32Array(next.capacity * TARGET_FLOATS)
-    }
+    stateScratch = ensureScratch(stateScratch, next.capacity * STATE_FLOATS)
+    targetScratch = ensureScratch(targetScratch, next.capacity * TARGET_FLOATS)
   }
 
   function init(canvas: HTMLCanvasElement, devicePixelRatio: number): void {
@@ -143,7 +129,7 @@ export function createWebGL2Backend(opts: WebGL2Options): Backend {
 
   const api: Backend = {
     init,
-    uploadField(field: ParticleField): void {
+    uploadField(field: ParticleField, full = false): void {
       if (!gl || !buffers) return
       lastField = field
       const plan = planReconcile(active, count, field.active) // field.active == new targets.count
@@ -158,6 +144,21 @@ export function createWebGL2Backend(opts: WebGL2Options): Backend {
         0,
         packTargetsInto(targetScratch, field, field.count),
       )
+
+      if (full) {
+        // The CPU field was mutated outside reconcile (e.g. snapField), so the
+        // plan's diff doesn't describe it — re-upload the whole live state.
+        gl.bindBuffer(gl.ARRAY_BUFFER, current)
+        gl.bufferSubData(
+          gl.ARRAY_BUFFER,
+          0,
+          packStateInto(stateScratch, field, 0, field.count),
+        )
+        active = field.active
+        count = field.count
+        lastUpload = performance.now()
+        return
+      }
 
       if (plan.firstLoad) {
         gl.bindBuffer(gl.ARRAY_BUFFER, current)
@@ -203,8 +204,8 @@ export function createWebGL2Backend(opts: WebGL2Options): Backend {
         c,
         colorRate: COLOR_RATE,
         opacityRate: OPACITY_RATE,
-        jitter: JITTER_AMOUNT,
-        seed: Math.random() * 1000,
+        jitter,
+        seed: (Math.random() * 0x100000000) >>> 0,
       })
       b.read = (b.read ^ 1) as 0 | 1
     },

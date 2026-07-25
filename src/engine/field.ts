@@ -59,10 +59,6 @@ export function growField(
   return next
 }
 
-function copySlot(field: ParticleField, src: number, dst: number): void {
-  for (const key of ARRAY_KEYS) field[key][dst] = field[key][src]!
-}
-
 function retargetActive(
   field: ParticleField,
   i: number,
@@ -104,12 +100,13 @@ export function reconcile(
     const prevActive = field.active
     for (let i = plan.spawn.start; i < plan.spawn.end; i++) {
       if (prevActive > 0) {
-        const src = i % prevActive
-        copySlot(f, src, i)
-        // Spawn at the source's HOME, not its live position: under GPU
+        // Spawn at a live particle's HOME, not its live position: under GPU
         // backends the CPU field's x/y are stale (the sim runs on the GPU),
         // while homes are authoritative on every tier and equal the live
-        // position once the field has settled.
+        // position once the field has settled. Homes/targetAlpha for this
+        // slot are set by retargetActive below (every spawned slot is
+        // < plan.active), so nothing else needs copying from src.
+        const src = i % prevActive
         f.x[i] = f.homeX[src]!
         f.y[i] = f.homeY[src]!
         f.r[i] = f.homeR[src]!
@@ -133,6 +130,43 @@ export function reconcile(
   f.active = plan.active
   f.count = plan.count
   return f
+}
+
+/**
+ * Completes the current morph instantly: every slot lands at its home with its
+ * home color, velocities zeroed and alpha at its target; fully-faded faders are
+ * dropped. Used for prefers-reduced-motion — content changes become opacity
+ * fades with no movement. The result satisfies isFieldSettled.
+ */
+export function snapField(field: ParticleField): void {
+  const {
+    x,
+    y,
+    vx,
+    vy,
+    homeX,
+    homeY,
+    r,
+    g,
+    b,
+    homeR,
+    homeG,
+    homeB,
+    alpha,
+    targetAlpha,
+  } = field
+  for (let i = 0; i < field.count; i++) {
+    x[i] = homeX[i]!
+    y[i] = homeY[i]!
+    vx[i] = 0
+    vy[i] = 0
+    r[i] = homeR[i]!
+    g[i] = homeG[i]!
+    b[i] = homeB[i]!
+    alpha[i] = targetAlpha[i]!
+  }
+  // Faders snapped to alpha 0 are invisible; drop them from the tail.
+  field.count = field.active
 }
 
 /**

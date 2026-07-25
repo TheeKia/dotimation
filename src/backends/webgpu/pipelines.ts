@@ -1,5 +1,5 @@
 import { MAX_STEPS_PER_FRAME } from '@/engine/clock'
-import { STATE_FLOATS } from '@/engine/reconcile-plan'
+import { STATE_FLOATS } from '../gpu-shared'
 import { DRAW_WGSL } from './shaders/draw.wgsl'
 import { SIM_WGSL } from './shaders/sim.wgsl'
 

@@ -13,9 +13,12 @@ export interface EngineOptions {
 const SETTLE_SECONDS = computeSettleDuration(SETTLE_TIME, OPACITY_RATE)
 
 export interface Engine {
-  setField(field: ParticleField): void
+  /** Push a reconciled field; `full` is forwarded to Backend.uploadField. */
+  setField(field: ParticleField, full?: boolean): void
   /** Update the dot footprint live (read at draw time) without recreating the engine. */
   setDotSize(dotSize: number): void
+  /** Switch idle behavior live (read by the loop each frame) without recreating the engine. */
+  setIdle(next: IdleBehavior): void
   /**
    * Resize in place without tearing down the engine — the component calls this
    * on width/height changes so simulation state survives across resizes.
@@ -25,29 +28,26 @@ export interface Engine {
 }
 
 export function createEngine(opts: EngineOptions): Engine {
-  const { backend, canvas, idle } = opts
+  const { backend, canvas } = opts
+  let idle = opts.idle
   let rafId = 0
   let running = false
   let last = 0
   let accumulator = 0
   let awakeUntil = 0
   let visible = true
-  // When true, the next frame redraws even if no physics step ran (a fresh
-  // field/resize/dot-size change made the last drawn frame stale).
-  let dirty = true
 
   const loop = (now: number): void => {
     const r = accumulate(accumulator, (now - last) / 1000)
     last = now
     accumulator = r.accumulator
     for (let i = 0; i < r.steps; i++) backend.step(FIXED_DT)
-    // Skip the redraw on frames where nothing advanced — e.g. a display
-    // refreshing faster than the 90 Hz fixed step yields 0-step frames whose
-    // output is identical to the previous one.
-    if (r.steps > 0 || dirty) {
-      backend.draw()
-      dirty = false
-    }
+    // Draw unconditionally while running: a skipped present is what made
+    // cleared-buffer flicker possible on high-refresh displays, and skipping
+    // was only ever worth it when preserveDrawingBuffer paid for it on every
+    // real present. The loop only runs during the awake window, so the extra
+    // draws are bounded and cheap.
+    backend.draw()
     if (idle === 'sleep' && (now >= awakeUntil || backend.settled?.())) {
       stop()
       return
@@ -71,7 +71,6 @@ export function createEngine(opts: EngineOptions): Engine {
 
   const wake = (): void => {
     awakeUntil = performance.now() + SETTLE_SECONDS * 1000
-    dirty = true
     if (!running && visible) start()
   }
 
@@ -91,13 +90,24 @@ export function createEngine(opts: EngineOptions): Engine {
   io?.observe(canvas)
 
   return {
-    setField(field): void {
-      backend.uploadField(field)
+    setField(field, full): void {
+      backend.uploadField(field, full)
       wake()
     },
     setDotSize(dotSize): void {
       backend.setDotSize(dotSize)
       wake()
+    },
+    setIdle(next): void {
+      if (next === idle) return
+      idle = next
+      // 'animate' must run whenever visible; 'sleep' gets one settle window
+      // so an in-flight morph finishes before the loop stops itself.
+      if (idle === 'animate') {
+        if (visible && !running) start()
+      } else {
+        wake()
+      }
     },
     resize(devW, devH): void {
       backend.resize(devW, devH)

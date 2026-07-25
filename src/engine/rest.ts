@@ -4,12 +4,14 @@ import type { ParticleField } from '@/types'
 // transition has visually finished, so the engine never sleeps mid-morph. The
 // cosmetic ±0.5px jitter is intentionally ignored (it perturbs position, not
 // velocity, and stops anyway when the loop sleeps).
-const VEL_EPS_SQ = 0.05 * 0.05 // (px/s)^2 — spring essentially stopped
-const POS_EPS = 1 // px from home; loose enough for the ±0.5px jitter, tight
+// Exported so stepField can evaluate the same predicate inline (fused into its
+// per-particle loop, making the backend's per-frame settled() check O(1)).
+export const VEL_EPS_SQ: number = 0.05 * 0.05 // (px/s)^2 — spring essentially stopped
+export const POS_EPS: number = 1 // px from home; loose enough for the ±0.5px jitter, tight
 // enough to catch a not-yet-moved particle (0-step first frame on a high-refresh
 // display has ~0 velocity but a large position error).
-const COLOR_EPS = 0.5 // within half an 8-bit level of the home color
-const ALPHA_EPS = 0.01
+export const COLOR_EPS: number = 0.5 // within half an 8-bit level of the home color
+export const ALPHA_EPS: number = 0.01
 
 /**
  * True when the spring, color ease, and alpha fade have converged for every

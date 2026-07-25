@@ -1,6 +1,3 @@
-export const STATE_FLOATS = 8
-export const TARGET_FLOATS = 6
-
 export interface FieldDelta {
   active: number
   count: number

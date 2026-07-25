@@ -2,19 +2,27 @@ import type { AnimateItem } from '@/types'
 import { getAutoFontSize, getMonospaceFontSize } from '@/utils/font'
 
 export const DEFAULT_TEXT_COLOR = 'rgb(200,200,200)'
+export const LINE_HEIGHT_FACTOR = 1.2
+const MIN_FONT_SIZE = 10
 
 type Ctx2D = CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D
 
 export function resolveFontSize(
   item: Extract<AnimateItem, { type: 'text' }>,
   width: number,
+  height: number,
 ): number {
-  if (item.fontSize === 'AUTO_MONO')
-    return getMonospaceFontSize(width, item.data)
-  if (item.fontSize === 'AUTO' || item.fontSize === undefined) {
-    return getAutoFontSize(width, item.data)
-  }
-  return item.fontSize
+  if (typeof item.fontSize === 'number') return item.fontSize
+  const size =
+    item.fontSize === 'AUTO_MONO'
+      ? getMonospaceFontSize(width, item.data)
+      : getAutoFontSize(width, item.data)
+  // Width-derived sizes can overflow a short canvas when the text has many
+  // lines; clamp so the whole block fits vertically (still floored at the
+  // heuristics' minimum — better to clip than to vanish).
+  const lines = item.data.split('\n').length
+  const maxForHeight = height / (lines * LINE_HEIGHT_FACTOR)
+  return Math.max(MIN_FONT_SIZE, Math.min(size, maxForHeight))
 }
 
 export function drawText(
@@ -24,13 +32,13 @@ export function drawText(
   height: number,
   defaultFontFamily: string,
 ): void {
-  const fontSize = resolveFontSize(item, width)
+  const fontSize = resolveFontSize(item, width, height)
   ctx.font = `${fontSize}px ${item.fontFamily || defaultFontFamily}`
   ctx.fillStyle = item.textColor || DEFAULT_TEXT_COLOR
   ctx.textAlign = 'center'
   ctx.textBaseline = 'middle'
   const lines = item.data.split('\n')
-  const lineHeight = fontSize * 1.2
+  const lineHeight = fontSize * LINE_HEIGHT_FACTOR
   const startY = (height - lines.length * lineHeight) / 2 + lineHeight / 2
   for (const [index, line] of lines.entries()) {
     ctx.fillText(line, width / 2, startY + index * lineHeight)

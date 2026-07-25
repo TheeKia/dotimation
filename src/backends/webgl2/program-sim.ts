@@ -1,4 +1,4 @@
-import { STATE_FLOATS, TARGET_FLOATS } from '@/engine/reconcile-plan'
+import { STATE_FLOATS, TARGET_FLOATS } from '../gpu-shared'
 import { createProgram } from './gl'
 import { SIM_VERT } from './shaders/sim.vert'
 
@@ -16,6 +16,7 @@ export interface SimUniforms {
   colorRate: number
   opacityRate: number
   jitter: number
+  /** Fresh 32-bit unsigned integer per step (uploaded via uniform1ui). */
   seed: number
 }
 
@@ -141,7 +142,7 @@ export function createSimProgram(gl: WebGL2RenderingContext): SimProgram {
       gl.uniform1f(loc.uColorRate, u.colorRate)
       gl.uniform1f(loc.uOpacityRate, u.opacityRate)
       gl.uniform1f(loc.uJitter, u.jitter)
-      gl.uniform1f(loc.uSeed, u.seed)
+      gl.uniform1ui(loc.uSeed, u.seed)
 
       gl.bindTransformFeedback(gl.TRANSFORM_FEEDBACK, tf)
       gl.bindBufferBase(gl.TRANSFORM_FEEDBACK_BUFFER, 0, write)

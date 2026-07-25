@@ -1,4 +1,4 @@
-import { STATE_FLOATS } from '@/engine/reconcile-plan'
+import { STATE_FLOATS } from '../gpu-shared'
 import { createProgram } from './gl'
 import { DRAW_FRAG } from './shaders/draw.frag'
 import { DRAW_VERT } from './shaders/draw.vert'

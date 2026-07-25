@@ -105,6 +105,16 @@ describe('renderField', () => {
     renderField(view, f, 8, 8, 1, 2)
     expect(view.reduce((n, v) => n + (v !== 0 ? 1 : 0), 0)).toBe(4)
   })
+
+  test('dotSize is CSS px: dotSize 1 at dpr 2 paints a 2x2 device-pixel footprint', () => {
+    const f = reconcile(createField(1), one(1, 1))
+    f.x[0] = 1
+    f.y[0] = 1
+    f.alpha[0] = 1
+    const view = new Uint32Array(8 * 8)
+    renderField(view, f, 8, 8, 2, 1)
+    expect(view.reduce((n, v) => n + (v !== 0 ? 1 : 0), 0)).toBe(4)
+  })
 })
 
 describe('computeDirtyRect', () => {

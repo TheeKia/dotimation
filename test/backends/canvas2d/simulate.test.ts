@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test'
 import { stepField } from '@/backends/canvas2d/simulate'
 import { COLOR_RATE, JITTER_AMOUNT } from '@/engine/constants'
 import { createField, reconcile } from '@/engine/field'
+import { isFieldSettled } from '@/engine/rest'
 import { tuneSpring } from '@/engine/settle'
 import type { FieldTargets } from '@/types'
 
@@ -66,5 +67,27 @@ describe('stepField', () => {
     for (let i = 0; i < 500; i++)
       stepField(f, 1 / 90, spring.k, spring.c, () => 0.5)
     expect(f.count).toBe(0)
+  })
+})
+
+describe('stepField settled reporting', () => {
+  test('reports unsettled in flight, settled at rest, matching isFieldSettled', () => {
+    const f = reconcile(createField(4), one(100, 40))
+    f.x[0] = 0
+    f.y[0] = 0
+    // rand=0.5 → zero jitter, so the report is deterministic.
+    let reported = stepField(f, 1 / 90, spring.k, spring.c, () => 0.5)
+    expect(reported).toBe(false)
+    expect(isFieldSettled(f)).toBe(false)
+    for (let i = 0; i < 90 * 5; i++) {
+      reported = stepField(f, 1 / 90, spring.k, spring.c, () => 0.5)
+    }
+    expect(reported).toBe(true)
+    expect(isFieldSettled(f)).toBe(true)
+  })
+
+  test('reports settled for an empty field', () => {
+    const f = createField(1)
+    expect(stepField(f, 1 / 90, spring.k, spring.c, () => 0.5)).toBe(true)
   })
 })

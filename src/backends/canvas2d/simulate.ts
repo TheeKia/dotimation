@@ -1,4 +1,5 @@
 import { COLOR_RATE, JITTER_AMOUNT, OPACITY_RATE } from '@/engine/constants'
+import { ALPHA_EPS, COLOR_EPS, POS_EPS, VEL_EPS_SQ } from '@/engine/rest'
 import type { ParticleField } from '@/types'
 import { createFastRand } from '../../utils/prng'
 
@@ -10,8 +11,11 @@ const fastRand = createFastRand(Date.now())
 
 /**
  * Advances every slot one fixed step and compacts dead faders (targetAlpha 0
- * that have faded below epsilon) off the tail. `rand` is injectable for
- * deterministic tests.
+ * that have faded below epsilon) off the tail. Returns true when every slot
+ * satisfies the same convergence predicate as isFieldSettled — evaluated
+ * inline so the engine's per-frame settled() check is O(1) instead of a
+ * second O(count) pass. `rand` is injectable for deterministic tests.
+ * `jitterAmount` overrides the shimmer amplitude (0 under reduced motion).
  */
 export function stepField(
   field: ParticleField,
@@ -19,7 +23,8 @@ export function stepField(
   k: number,
   c: number,
   rand: () => number = fastRand,
-): void {
+  jitterAmount: number = JITTER_AMOUNT,
+): boolean {
   const {
     x,
     y,
@@ -43,6 +48,7 @@ export function stepField(
   const colorFactor = 1 - Math.exp(-COLOR_RATE * dt)
   const delta = OPACITY_RATE * dt
 
+  let settled = true
   for (let i = 0; i < field.count; i++) {
     const ax = k * (homeX[i]! - x[i]!) - c * vx[i]!
     const ay = k * (homeY[i]! - y[i]!) - c * vy[i]!
@@ -51,7 +57,7 @@ export function stepField(
     // Jitter is applied to X only — a deliberate horizontal shimmer carried
     // over from the original engine. Do not add Y jitter without intent: it
     // would change the established visual look.
-    x[i]! += vx[i]! * dt + (rand() - 0.5) * JITTER_AMOUNT
+    x[i]! += vx[i]! * dt + (rand() - 0.5) * jitterAmount
     y[i]! += vy[i]! * dt
     r[i] = r[i]! + (homeR[i]! - r[i]!) * colorFactor
     g[i] = g[i]! + (homeG[i]! - g[i]!) * colorFactor
@@ -60,6 +66,20 @@ export function stepField(
       targetAlpha[i]! > 0.5
         ? Math.min(1, alpha[i]! + delta)
         : Math.max(0, alpha[i]! - delta)
+    if (
+      settled &&
+      (vx[i]! * vx[i]! + vy[i]! * vy[i]! > VEL_EPS_SQ ||
+        Math.abs(x[i]! - homeX[i]!) > POS_EPS ||
+        Math.abs(y[i]! - homeY[i]!) > POS_EPS ||
+        (targetAlpha[i]! > 0.5
+          ? alpha[i]! < 1 - ALPHA_EPS
+          : alpha[i]! > ALPHA_EPS) ||
+        Math.abs(r[i]! - homeR[i]!) > COLOR_EPS ||
+        Math.abs(g[i]! - homeG[i]!) > COLOR_EPS ||
+        Math.abs(b[i]! - homeB[i]!) > COLOR_EPS)
+    ) {
+      settled = false
+    }
   }
 
   // Compact dead faders (targetAlpha 0 and alpha ~ 0) from the tail.
@@ -89,4 +109,5 @@ export function stepField(
       field.count--
     }
   }
+  return settled
 }
