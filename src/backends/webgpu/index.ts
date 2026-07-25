@@ -51,7 +51,11 @@ export function createWebGPUBackend(opts: WebGPUOptions): Backend {
   // per step/draw. simBindGroups is indexed by the ping-pong read index.
   let simBindGroups: [GPUBindGroup, GPUBindGroup] | null = null
   let renderBind: GPUBindGroup | null = null
-  const simU = new Float32Array(8)
+  // One backing buffer, two views: slot 6 (the jitter seed) is a u32 in the
+  // WGSL Params struct, the rest are f32.
+  const simUBytes = new ArrayBuffer(8 * 4)
+  const simU = new Float32Array(simUBytes)
+  const simUu32 = new Uint32Array(simUBytes)
   const renderU = new Float32Array(4)
   // The render uniforms (devW/devH/dpr/dotSize) change only on resize/dotSize,
   // so the GPU write is skipped on frames where they are unchanged.
@@ -219,7 +223,7 @@ export function createWebGPUBackend(opts: WebGPUOptions): Backend {
         // other tiers' per-step reseed); the passes select their slice via
         // dynamic offset since all writeBuffers land before the one submit.
         for (let s = 0; s < steps; s++) {
-          simU[6] = Math.random() * 1000
+          simUu32[6] = (Math.random() * 0x100000000) >>> 0
           device.queue.writeBuffer(
             pipelines.simUniform,
             s * pipelines.simUniformStride,

@@ -193,7 +193,7 @@ export function createWebGL2Backend(opts: WebGL2Options): Backend {
         colorRate: COLOR_RATE,
         opacityRate: OPACITY_RATE,
         jitter: JITTER_AMOUNT,
-        seed: Math.random() * 1000,
+        seed: (Math.random() * 0x100000000) >>> 0,
       })
       b.read = (b.read ^ 1) as 0 | 1
     },
