@@ -19,10 +19,13 @@ import type {
 import { useIsomorphicLayoutEffect } from '@/utils/isomorphic-layout-effect'
 import { getDpr, sizeCanvas } from '@/utils/utils'
 
-type DotimationProps = {
+/** Fixed CSS-px size, or `fill` to track the parent box via ResizeObserver. */
+type SizeProps =
+  | { width: number; height: number; fill?: false }
+  | { fill: true; width?: undefined; height?: undefined }
+
+type DotimationProps = SizeProps & {
   item: AnimateItem
-  width: number
-  height: number
   /** React 19 ref to the underlying canvas element. */
   ref?: React.Ref<HTMLCanvasElement>
   /** @deprecated Pass `ref` instead (React 19 forwards it as a regular prop). */
@@ -61,8 +64,9 @@ type DotimationProps = {
 
 export default function Dotimation({
   item,
-  width,
-  height,
+  width: propWidth,
+  height: propHeight,
+  fill,
   ref: forwardedRef,
   className,
   canvasRef,
@@ -79,6 +83,14 @@ export default function Dotimation({
   reducedMotion,
   onStats,
 }: DotimationProps): React.ReactNode {
+  // In fill mode the canvas is styled 100%/100% and its CSS content box is the
+  // size authority; until the observer reports, size is 0 (renders nothing).
+  const fillMode = fill === true
+  const [observed, setObserved] = useState<{ w: number; h: number } | null>(
+    null,
+  )
+  const width = fillMode ? (observed?.w ?? 0) : (propWidth ?? 0)
+  const height = fillMode ? (observed?.h ?? 0) : (propHeight ?? 0)
   const ref = useRef<HTMLCanvasElement>(null)
   const engineRef = useRef<Engine | null>(null)
   const fieldRef = useRef<ParticleField>(createField(1024))
@@ -114,6 +126,31 @@ export default function Dotimation({
 
   useImperativeHandle(forwardedRef, () => ref.current!)
   useImperativeHandle(canvasRef, () => ref.current!)
+
+  // Fill mode: track the canvas's CSS content box. Deps mirror the canvas key
+  // so a remounted element is re-observed. No feedback loop: the observer
+  // reacts to CSS size, and this component only writes the backing-store
+  // attributes (the CSS box stays 100%/100%).
+  // biome-ignore lint/correctness/useExhaustiveDependencies(backend): participates in the canvas key — a remounted element must be re-observed
+  // biome-ignore lint/correctness/useExhaustiveDependencies(dprEpoch): same
+  // biome-ignore lint/correctness/useExhaustiveDependencies(maxDpr): same
+  // biome-ignore lint/correctness/useExhaustiveDependencies(reduced): same
+  useEffect(() => {
+    if (!fillMode) return
+    const canvas = ref.current
+    if (!canvas || typeof ResizeObserver === 'undefined') return
+    const ro = new ResizeObserver((entries) => {
+      const rect = entries[0]?.contentRect
+      if (!rect) return
+      const w = Math.round(rect.width)
+      const h = Math.round(rect.height)
+      setObserved((prev) =>
+        prev && prev.w === w && prev.h === h ? prev : { w, h },
+      )
+    })
+    ro.observe(canvas)
+    return () => ro.disconnect()
+  }, [fillMode, backend, dprEpoch, maxDpr, reduced])
 
   const fontEpoch = useFontEpoch(item, defaultFontFamily)
   const targets = useFieldTargets(
@@ -284,7 +321,11 @@ export default function Dotimation({
       key={`${backend}:${dprEpoch}:${maxDpr}:${reduced ? 'rm' : 'm'}`}
       ref={ref}
       className={className}
-      style={{ width: `${width}px`, height: `${height}px`, ...style }}
+      style={
+        fillMode
+          ? { width: '100%', height: '100%', ...style }
+          : { width: `${width}px`, height: `${height}px`, ...style }
+      }
       role="img"
       aria-label={ariaLabel ?? (item.type === 'text' ? item.data : undefined)}
     />

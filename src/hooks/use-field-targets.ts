@@ -121,8 +121,9 @@ export function useFieldTargets(
     const id = ++executionId.current
 
     // An empty item is a valid layout (zero particles): publish it so the
-    // field fades out instead of freezing the previous content forever.
-    if (!item.data) {
+    // field fades out instead of freezing the previous content forever. A
+    // non-positive size means fill mode hasn't measured yet — same treatment.
+    if (!item.data || width <= 0 || height <= 0) {
       setTargets(emptyFieldTargets())
       return
     }
