@@ -24,6 +24,9 @@ export function createCanvas2DBackend(opts: Canvas2DOptions): Backend {
   let field: ParticleField | null = null
   let dotSize = opts.dotSize
   let prevDirty: DirtyRect | null = null
+  // stepField's per-step convergence report; null = no step since the last
+  // upload (fall back to the O(count) reference predicate once).
+  let settledFlag: boolean | null = null
   const { k, c } = tuneSpring({ settleTime: SETTLE_TIME, zeta: ZETA })
 
   function ensureBuffer(): void {
@@ -50,12 +53,13 @@ export function createCanvas2DBackend(opts: Canvas2DOptions): Backend {
     },
     uploadField(next): void {
       field = next
+      settledFlag = null
     },
     setDotSize(next): void {
       dotSize = next
     },
     step(dt): void {
-      if (field) stepField(field, dt, k, c)
+      if (field) settledFlag = stepField(field, dt, k, c)
     },
     draw(): void {
       if (!ctx || !field) return
@@ -69,7 +73,8 @@ export function createCanvas2DBackend(opts: Canvas2DOptions): Backend {
       ctx.putImageData(imageData, 0, 0, clearR.x, clearR.y, clearR.w, clearR.h)
     },
     settled(): boolean {
-      return field ? isFieldSettled(field) : true
+      if (!field) return true
+      return settledFlag ?? isFieldSettled(field)
     },
     resize(w, h): void {
       devW = w
