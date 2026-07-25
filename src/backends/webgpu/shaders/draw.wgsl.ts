@@ -15,7 +15,9 @@ fn vs(
   @location(2) instColor: vec3<f32>,
   @location(3) instAlpha: f32,
 ) -> VOut {
-  let dev = floor(instPos * R.dpr + vec2<f32>(0.5, 0.5)) + corner * R.dotSize;
+  // CSS-px dot size -> device-px footprint, rounded like the other tiers.
+  let sizeDev = max(1.0, floor(R.dotSize * R.dpr + 0.5));
+  let dev = floor(instPos * R.dpr + vec2<f32>(0.5, 0.5)) + corner * sizeDev;
   let clip = vec2<f32>(dev.x / R.devW * 2.0 - 1.0, 1.0 - dev.y / R.devH * 2.0);
   var o: VOut;
   o.pos = vec4<f32>(clip, 0.0, 1.0);

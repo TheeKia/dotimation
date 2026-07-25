@@ -30,7 +30,8 @@ export function computeDirtyRect(
   dpr: number,
   dotSize: number,
 ): DirtyRect | null {
-  const size = Math.max(1, Math.round(dotSize))
+  // dotSize is CSS px; the footprint is device px (matches both GPU shaders).
+  const size = Math.max(1, Math.round(dotSize * dpr))
   const { x, y, alpha } = field
   const count = field.count
   let minX = Infinity
@@ -141,7 +142,8 @@ export function renderField(
   } else {
     view.fill(0)
   }
-  const size = Math.max(1, Math.round(dotSize))
+  // dotSize is CSS px; the footprint is device px (matches both GPU shaders).
+  const size = Math.max(1, Math.round(dotSize * dpr))
   const { x, y, r, g, b, alpha } = field
   const count = field.count
 

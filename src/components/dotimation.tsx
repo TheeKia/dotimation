@@ -34,7 +34,7 @@ type DotimationProps = {
   alpha?: number
   /** @default 2 */
   pointSpacingCss?: number
-  /** @default 1 */
+  /** Dot footprint in CSS px (scales with devicePixelRatio). @default 1 */
   dotSize?: number
   /** @default 'auto' */
   backend?: BackendKind
