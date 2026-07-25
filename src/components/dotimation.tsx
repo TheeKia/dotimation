@@ -1,6 +1,12 @@
 'use client'
 
-import { useEffect, useImperativeHandle, useRef, useState } from 'react'
+import {
+  useEffect,
+  useImperativeHandle,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from 'react'
 import { createEngine, type Engine } from '@/engine/engine'
 import { createField, reconcile } from '@/engine/field'
 import { selectBackend } from '@/engine/select'
@@ -100,6 +106,24 @@ export default function Dotimation({
     return () => mq.removeEventListener('change', onChange)
   }, [dprEpoch])
 
+  // Size the canvas before paint. This is the ONLY place the canvas backing
+  // store is sized (the JSX deliberately carries no width/height attributes —
+  // React re-committing them in CSS px would clear the canvas at the wrong
+  // size on every resize). Also notifies the live engine, in place, so
+  // simulation state survives (the morph continues instead of restarting).
+  // biome-ignore lint/correctness/useExhaustiveDependencies(backend): a backend change remounts the canvas (see the key), and the fresh element must be sized again
+  // biome-ignore lint/correctness/useExhaustiveDependencies(dprEpoch): sizeCanvas reads devicePixelRatio, which changed exactly when dprEpoch was bumped
+  useLayoutEffect(() => {
+    const canvas = ref.current
+    if (!canvas) return
+    const prevW = canvas.width
+    const prevH = canvas.height
+    sizeCanvas(canvas, width, height)
+    if (canvas.width !== prevW || canvas.height !== prevH) {
+      engineRef.current?.resize(canvas.width, canvas.height)
+    }
+  }, [width, height, backend, dprEpoch])
+
   // Create / recreate the engine when the backend config or device pixel
   // ratio changes. Size changes do NOT recreate it (see the resize effect).
   // biome-ignore lint/correctness/useExhaustiveDependencies(dprEpoch): sizeCanvas reads devicePixelRatio, which changed exactly when dprEpoch was bumped — the dep recreates the engine at the new density
@@ -173,16 +197,6 @@ export default function Dotimation({
     }
   }, [backend, idle, dprEpoch])
 
-  // Live resize: retune the backing store and notify the engine in place, so
-  // simulation state survives (the morph continues instead of restarting).
-  useEffect(() => {
-    const canvas = ref.current
-    const engine = engineRef.current
-    if (!canvas || !engine) return
-    sizeCanvas(canvas, width, height)
-    engine.resize(canvas.width, canvas.height)
-  }, [width, height])
-
   // dotSize only affects draw-time rendering, so push it to the live backend
   // instead of recreating the engine (which would reset every particle).
   useEffect(() => {
@@ -210,8 +224,6 @@ export default function Dotimation({
       key={`${backend}:${dprEpoch}`}
       ref={ref}
       className={className}
-      width={width}
-      height={height}
       style={style}
     />
   )
