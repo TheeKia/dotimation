@@ -32,22 +32,18 @@ export function createEngine(opts: EngineOptions): Engine {
   let accumulator = 0
   let awakeUntil = 0
   let visible = true
-  // When true, the next frame redraws even if no physics step ran (a fresh
-  // field/resize/dot-size change made the last drawn frame stale).
-  let dirty = true
 
   const loop = (now: number): void => {
     const r = accumulate(accumulator, (now - last) / 1000)
     last = now
     accumulator = r.accumulator
     for (let i = 0; i < r.steps; i++) backend.step(FIXED_DT)
-    // Skip the redraw on frames where nothing advanced — e.g. a display
-    // refreshing faster than the 90 Hz fixed step yields 0-step frames whose
-    // output is identical to the previous one.
-    if (r.steps > 0 || dirty) {
-      backend.draw()
-      dirty = false
-    }
+    // Draw unconditionally while running: a skipped present is what made
+    // cleared-buffer flicker possible on high-refresh displays, and skipping
+    // was only ever worth it when preserveDrawingBuffer paid for it on every
+    // real present. The loop only runs during the awake window, so the extra
+    // draws are bounded and cheap.
+    backend.draw()
     if (idle === 'sleep' && (now >= awakeUntil || backend.settled?.())) {
       stop()
       return
@@ -71,7 +67,6 @@ export function createEngine(opts: EngineOptions): Engine {
 
   const wake = (): void => {
     awakeUntil = performance.now() + SETTLE_SECONDS * 1000
-    dirty = true
     if (!running && visible) start()
   }
 
