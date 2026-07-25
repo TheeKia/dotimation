@@ -26,8 +26,9 @@ function runRasterize(inputs: RasterInputs): Promise<FieldTargets> {
     alpha,
     pointSpacingCss,
     maxParticles,
+    maxDpr,
   } = inputs
-  const dpr = getDpr()
+  const dpr = getDpr(maxDpr)
   if (workerRasterAvailable() && isWorkerSafe(item, defaultFontFamily)) {
     return rasterizeViaWorker(
       width,
@@ -47,6 +48,7 @@ function runRasterize(inputs: RasterInputs): Promise<FieldTargets> {
         alpha,
         pointSpacingCss,
         maxParticles,
+        dpr,
       ),
     )
   }
@@ -58,6 +60,7 @@ function runRasterize(inputs: RasterInputs): Promise<FieldTargets> {
     alpha,
     pointSpacingCss,
     maxParticles,
+    dpr,
   )
 }
 
@@ -69,7 +72,9 @@ export function useFieldTargets(
   alpha: number,
   pointSpacingCss: number,
   maxParticles: number,
+  maxDpr: number,
   dprEpoch: number,
+  fontEpoch: number,
 ): FieldTargets | null {
   const [targets, setTargets] = useState<FieldTargets | null>(null)
   const prev = useRef<RasterInputs | null>(null)
@@ -107,15 +112,18 @@ export function useFieldTargets(
       alpha,
       pointSpacingCss,
       maxParticles,
+      maxDpr,
       dprEpoch,
+      fontEpoch,
     }
     if (prev.current && sameRasterInputs(prev.current, next)) return
     prev.current = next
     const id = ++executionId.current
 
     // An empty item is a valid layout (zero particles): publish it so the
-    // field fades out instead of freezing the previous content forever.
-    if (!item.data) {
+    // field fades out instead of freezing the previous content forever. A
+    // non-positive size means fill mode hasn't measured yet — same treatment.
+    if (!item.data || width <= 0 || height <= 0) {
       setTargets(emptyFieldTargets())
       return
     }
@@ -128,7 +136,9 @@ export function useFieldTargets(
     alpha,
     pointSpacingCss,
     maxParticles,
+    maxDpr,
     dprEpoch,
+    fontEpoch,
   ])
 
   return targets

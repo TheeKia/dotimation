@@ -13,6 +13,7 @@
     "@webgpu/types": "^0.1.71",
     "bumpp": "^11.1.0",
     "bunup": "^0.16.32",
+    "playwright": "^1.62.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "simple-git-hooks": "^2.13.1",
@@ -55,6 +56,7 @@
     "lint:fix": "biome check --write .",
     "release": "bumpp --commit --push --tag",
     "test": "bun test",
+    "test:e2e": "bun test/e2e/smoke.e2e.ts",
     "test:coverage": "bun test --coverage",
     "test:watch": "bun test --watch",
     "type-check": "tsc --noEmit"

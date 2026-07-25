@@ -56,6 +56,7 @@ export const DEFAULT_CONFIG: PlaygroundConfig = {
   backend: 'auto',
   idle: 'animate',
   maxParticles: undefined,
+  reducedMotion: false,
   stageSize: { mode: 'fill' },
   bg: 'dark',
 }

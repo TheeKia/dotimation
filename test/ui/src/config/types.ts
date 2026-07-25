@@ -37,6 +37,7 @@ export type PlaygroundConfig = {
   backend: BackendKind
   idle: IdleBehavior
   maxParticles: number | undefined
+  reducedMotion: boolean
   stageSize: StageSize
   bg: BgKind
 }

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { isWorkerSafe } from '@/raster/worker-safe'
+import { isGenericFamily, isWorkerSafe } from '@/raster/worker-safe'
 import type { AnimateItem } from '@/types'
 
 const img: AnimateItem = { type: 'image', data: 'x.png' }
@@ -36,5 +36,18 @@ describe('isWorkerSafe', () => {
       textColor: '#fff',
     }
     expect(isWorkerSafe(withString, 'sans-serif')).toBe(true)
+  })
+})
+
+describe('isGenericFamily', () => {
+  test('recognizes CSS generic families case-insensitively', () => {
+    expect(isGenericFamily('sans-serif')).toBe(true)
+    expect(isGenericFamily(' Monospace ')).toBe(true)
+    expect(isGenericFamily('system-ui')).toBe(true)
+  })
+
+  test('rejects custom families', () => {
+    expect(isGenericFamily('Inter')).toBe(false)
+    expect(isGenericFamily('Inter, sans-serif')).toBe(false)
   })
 })

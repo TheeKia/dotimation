@@ -10,7 +10,9 @@ const base = (over: Partial<RasterInputs> = {}): RasterInputs => ({
   alpha: 128,
   pointSpacingCss: 2,
   maxParticles: Number.POSITIVE_INFINITY,
+  maxDpr: 2,
   dprEpoch: 0,
+  fontEpoch: 0,
   ...over,
 })
 
@@ -30,7 +32,9 @@ describe('sameRasterInputs', () => {
     ['alpha', { alpha: 64 }],
     ['pointSpacingCss', { pointSpacingCss: 3 }],
     ['maxParticles', { maxParticles: 500 }],
+    ['maxDpr', { maxDpr: 3 }],
     ['dprEpoch', { dprEpoch: 1 }],
+    ['fontEpoch', { fontEpoch: 1 }],
   ] as const)('%s change is detected (regression: was ignored)', (_n, over) => {
     expect(sameRasterInputs(base(), base(over))).toBe(false)
   })

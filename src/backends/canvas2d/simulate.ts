@@ -1,5 +1,5 @@
 import { COLOR_RATE, JITTER_AMOUNT, OPACITY_RATE } from '@/engine/constants'
-import { ALPHA_EPS, COLOR_EPS, POS_EPS, VEL_EPS_SQ } from '@/engine/rest'
+import { isSlotSettled } from '@/engine/rest'
 import type { ParticleField } from '@/types'
 import { createFastRand } from '../../utils/prng'
 
@@ -66,20 +66,7 @@ export function stepField(
       targetAlpha[i]! > 0.5
         ? Math.min(1, alpha[i]! + delta)
         : Math.max(0, alpha[i]! - delta)
-    if (
-      settled &&
-      (vx[i]! * vx[i]! + vy[i]! * vy[i]! > VEL_EPS_SQ ||
-        Math.abs(x[i]! - homeX[i]!) > POS_EPS ||
-        Math.abs(y[i]! - homeY[i]!) > POS_EPS ||
-        (targetAlpha[i]! > 0.5
-          ? alpha[i]! < 1 - ALPHA_EPS
-          : alpha[i]! > ALPHA_EPS) ||
-        Math.abs(r[i]! - homeR[i]!) > COLOR_EPS ||
-        Math.abs(g[i]! - homeG[i]!) > COLOR_EPS ||
-        Math.abs(b[i]! - homeB[i]!) > COLOR_EPS)
-    ) {
-      settled = false
-    }
+    if (settled && !isSlotSettled(field, i)) settled = false
   }
 
   // Compact dead faders (targetAlpha 0 and alpha ~ 0) from the tail.

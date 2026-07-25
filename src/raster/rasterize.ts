@@ -35,11 +35,12 @@ export async function rasterize(
   alpha: number,
   pointSpacingCss: number,
   maxParticles: number = Number.POSITIVE_INFINITY,
+  dpr: number = getDpr(),
 ): Promise<FieldTargets> {
   const empty = emptyFieldTargets()
 
   const canvas = document.createElement('canvas')
-  const ctx = getCtx(canvas, width, height)
+  const ctx = getCtx(canvas, width, height, dpr)
   if (!ctx) return empty
 
   if (item.type === 'image') {
@@ -49,7 +50,6 @@ export async function rasterize(
     drawText(ctx, item, width, height, defaultFontFamily)
   }
 
-  const dpr = getDpr()
   const devW = canvas.width
   const devH = canvas.height
   const img = ctx.getImageData(0, 0, devW, devH)
