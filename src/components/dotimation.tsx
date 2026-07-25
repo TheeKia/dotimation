@@ -1,12 +1,6 @@
 'use client'
 
-import {
-  useEffect,
-  useImperativeHandle,
-  useLayoutEffect,
-  useRef,
-  useState,
-} from 'react'
+import { useEffect, useImperativeHandle, useRef, useState } from 'react'
 import { JITTER_AMOUNT } from '@/engine/constants'
 import { createEngine, type Engine } from '@/engine/engine'
 import { createField, reconcile, snapField } from '@/engine/field'
@@ -21,6 +15,7 @@ import type {
   IdleBehavior,
   ParticleField,
 } from '@/types'
+import { useIsomorphicLayoutEffect } from '@/utils/isomorphic-layout-effect'
 import { sizeCanvas } from '@/utils/utils'
 
 type DotimationProps = {
@@ -130,15 +125,16 @@ export default function Dotimation({
     return () => mq.removeEventListener('change', onChange)
   }, [dprEpoch])
 
-  // Size the canvas before paint. This is the ONLY place the canvas backing
-  // store is sized (the JSX deliberately carries no width/height attributes —
-  // React re-committing them in CSS px would clear the canvas at the wrong
-  // size on every resize). Also notifies the live engine, in place, so
-  // simulation state survives (the morph continues instead of restarting).
+  // Size the canvas backing store before paint. This is the ONLY writer of the
+  // width/height ATTRIBUTES (React re-committing them in CSS px would clear the
+  // canvas at the wrong size on every resize); the CSS box is declared in JSX
+  // style so server-rendered HTML reserves the right space. Also notifies the
+  // live engine, in place, so simulation state survives (the morph continues
+  // instead of restarting).
   // biome-ignore lint/correctness/useExhaustiveDependencies(backend): a backend change remounts the canvas (see the key), and the fresh element must be sized again
   // biome-ignore lint/correctness/useExhaustiveDependencies(reducedMotion): same — it participates in the canvas key
   // biome-ignore lint/correctness/useExhaustiveDependencies(dprEpoch): sizeCanvas reads devicePixelRatio, which changed exactly when dprEpoch was bumped
-  useLayoutEffect(() => {
+  useIsomorphicLayoutEffect(() => {
     const canvas = ref.current
     if (!canvas) return
     const prevW = canvas.width
@@ -270,7 +266,7 @@ export default function Dotimation({
       key={`${backend}:${dprEpoch}:${reducedMotion ? 'rm' : 'm'}`}
       ref={ref}
       className={className}
-      style={style}
+      style={{ width: `${width}px`, height: `${height}px`, ...style }}
       role="img"
       aria-label={ariaLabel ?? (item.type === 'text' ? item.data : undefined)}
     />
