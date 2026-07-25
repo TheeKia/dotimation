@@ -73,6 +73,11 @@ export default function Dotimation({
   // as a dependency (which would tear down the engine and reset the field).
   const dotSizeRef = useRef(dotSize)
   dotSizeRef.current = dotSize
+  // idle only affects loop policy, so push it to the live engine instead of
+  // recreating it (which would tear down the backend — on WebGPU a full
+  // device re-acquisition). Same ref pattern as dotSize.
+  const idleRef = useRef(idle)
+  idleRef.current = idle
   // Latest size, readable by the creation effect without being a dependency —
   // size changes are applied live via engine.resize, never by recreation.
   const sizeRef = useRef({ width, height })
@@ -141,6 +146,7 @@ export default function Dotimation({
 
     void (async () => {
       const constructedDotSize = dotSizeRef.current
+      const constructedIdle = idleRef.current
       let selected: Awaited<ReturnType<typeof selectBackend>>
       try {
         selected = await selectBackend({
@@ -163,12 +169,21 @@ export default function Dotimation({
         return
       }
       kindRef.current = selected.kind
-      engine = createEngine({ backend: selected.backend, canvas, dpr, idle })
+      engine = createEngine({
+        backend: selected.backend,
+        canvas,
+        dpr,
+        idle: constructedIdle,
+      })
       engineRef.current = engine
       // dotSize may have changed while the backend was initializing; the
       // setDotSize effect ran against a null engineRef and was dropped.
       if (dotSizeRef.current !== constructedDotSize) {
         engine.setDotSize(dotSizeRef.current)
+      }
+      // Likewise idle; its effect was likewise dropped.
+      if (idleRef.current !== constructedIdle) {
+        engine.setIdle(idleRef.current)
       }
       // So may the size; the resize effect was likewise dropped.
       const { width: w, height: h } = sizeRef.current
@@ -195,13 +210,18 @@ export default function Dotimation({
       engine?.dispose()
       engineRef.current = null
     }
-  }, [backend, idle, dprEpoch])
+  }, [backend, dprEpoch])
 
   // dotSize only affects draw-time rendering, so push it to the live backend
   // instead of recreating the engine (which would reset every particle).
   useEffect(() => {
     engineRef.current?.setDotSize(dotSize)
   }, [dotSize])
+
+  // idle only affects loop policy; push it live (see idleRef above).
+  useEffect(() => {
+    engineRef.current?.setIdle(idle)
+  }, [idle])
 
   // Push new targets into the live field whenever rasterization produces them.
   useEffect(() => {

@@ -16,6 +16,8 @@ export interface Engine {
   setField(field: ParticleField): void
   /** Update the dot footprint live (read at draw time) without recreating the engine. */
   setDotSize(dotSize: number): void
+  /** Switch idle behavior live (read by the loop each frame) without recreating the engine. */
+  setIdle(next: IdleBehavior): void
   /**
    * Resize in place without tearing down the engine — the component calls this
    * on width/height changes so simulation state survives across resizes.
@@ -25,7 +27,8 @@ export interface Engine {
 }
 
 export function createEngine(opts: EngineOptions): Engine {
-  const { backend, canvas, idle } = opts
+  const { backend, canvas } = opts
+  let idle = opts.idle
   let rafId = 0
   let running = false
   let last = 0
@@ -93,6 +96,17 @@ export function createEngine(opts: EngineOptions): Engine {
     setDotSize(dotSize): void {
       backend.setDotSize(dotSize)
       wake()
+    },
+    setIdle(next): void {
+      if (next === idle) return
+      idle = next
+      // 'animate' must run whenever visible; 'sleep' gets one settle window
+      // so an in-flight morph finishes before the loop stops itself.
+      if (idle === 'animate') {
+        if (visible && !running) start()
+      } else {
+        wake()
+      }
     },
     resize(devW, devH): void {
       backend.resize(devW, devH)
