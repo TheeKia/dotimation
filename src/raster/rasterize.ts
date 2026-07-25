@@ -1,7 +1,31 @@
 import type { AnimateItem, FieldTargets } from '@/types'
+import { createAsyncLru } from '@/utils/async-lru'
 import { getCtx, getDpr } from '@/utils/utils'
 import { drawImage, drawText } from './draw'
 import { emptyFieldTargets, invertPixels, sampleTargets } from './sample'
+
+// Decoded-image cache: a resize storm re-rasterizes the same URL dozens of
+// times; caching the decoded element skips the fetch+decode each time. Small
+// cap — entries are full decoded images.
+const imageCache = createAsyncLru<HTMLImageElement>(4)
+
+function loadImage(src: string): Promise<HTMLImageElement> {
+  const cached = imageCache.get(src)
+  if (cached) return cached
+  const loading = (async () => {
+    const image = new Image()
+    // crossOrigin must be set BEFORE src or the request goes out without CORS,
+    // tainting the canvas and making getImageData throw for cross-origin images.
+    image.crossOrigin = 'anonymous'
+    image.src = src
+    await image.decode()
+    return image
+  })()
+  // Drop failed loads so a later render can retry them.
+  loading.catch(() => imageCache.delete(src))
+  imageCache.set(src, loading)
+  return loading
+}
 
 export async function rasterize(
   width: number,
@@ -19,12 +43,7 @@ export async function rasterize(
   if (!ctx) return empty
 
   if (item.type === 'image') {
-    const image = new Image()
-    // crossOrigin must be set BEFORE src or the request goes out without CORS,
-    // tainting the canvas and making getImageData throw for cross-origin images.
-    image.crossOrigin = 'anonymous'
-    image.src = item.data
-    await image.decode()
+    const image = await loadImage(item.data)
     drawImage(ctx, image, image.width, image.height, width, height, item)
   } else {
     drawText(ctx, item, width, height, defaultFontFamily)

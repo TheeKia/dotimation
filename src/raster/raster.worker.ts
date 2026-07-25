@@ -1,7 +1,31 @@
 /// <reference lib="webworker" />
 import type { AnimateItem, FieldTargets } from '@/types'
+import { createAsyncLru } from '../utils/async-lru'
 import { drawImage, drawText } from './draw'
 import { invertPixels, sampleTargets } from './sample'
+
+// Decoded-bitmap cache; evicted bitmaps are closed to release their pixel
+// memory. The cache dies with the worker's ~10 s idle self-termination, so
+// memory is bounded in time as well as by the cap.
+const bitmapCache = createAsyncLru<ImageBitmap>(4, (evicted) => {
+  evicted.then(
+    (bmp) => bmp.close(),
+    () => {},
+  )
+})
+
+function loadBitmap(src: string): Promise<ImageBitmap> {
+  const cached = bitmapCache.get(src)
+  if (cached) return cached
+  const loading = (async () => {
+    const res = await fetch(src, { mode: 'cors' })
+    return createImageBitmap(await res.blob())
+  })()
+  // Drop failed loads so a later request can retry them.
+  loading.catch(() => bitmapCache.delete(src))
+  bitmapCache.set(src, loading)
+  return loading
+}
 
 interface RasterRequest {
   id: number
@@ -25,10 +49,10 @@ async function run(req: RasterRequest): Promise<FieldTargets> {
   ctx.imageSmoothingEnabled = false
 
   if (req.item.type === 'image') {
-    const res = await fetch(req.item.data, { mode: 'cors' })
-    const bmp = await createImageBitmap(await res.blob())
+    // The cache owns the bitmap's lifetime (closed on eviction), so no
+    // close() here — the next request for the same URL reuses it.
+    const bmp = await loadBitmap(req.item.data)
     drawImage(ctx, bmp, bmp.width, bmp.height, req.width, req.height, req.item)
-    bmp.close()
   } else {
     drawText(ctx, req.item, req.width, req.height, req.defaultFontFamily)
   }
