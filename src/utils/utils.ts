@@ -1,7 +1,7 @@
-/** Device pixel ratio, capped at 2 (the library-wide density policy). 1 outside a browser. */
-export function getDpr(): number {
+/** Device pixel ratio, capped at `max` (default 2). 1 outside a browser. */
+export function getDpr(max = 2): number {
   if (typeof window === 'undefined') return 1
-  return Math.min(window.devicePixelRatio || 1, 2)
+  return Math.min(window.devicePixelRatio || 1, max)
 }
 
 /**
@@ -15,8 +15,8 @@ export function sizeCanvas(
   canvas: HTMLCanvasElement,
   width: number,
   height: number,
+  dpr: number = getDpr(),
 ): number {
-  const dpr = getDpr()
   const devW = Math.round(width * dpr)
   const devH = Math.round(height * dpr)
   if (canvas.width !== devW) canvas.width = devW
@@ -32,8 +32,9 @@ export function getCtx(
   canvas: HTMLCanvasElement,
   width: number,
   height: number,
+  dpr: number = getDpr(),
 ): CanvasRenderingContext2D | null {
-  const dpr = sizeCanvas(canvas, width, height)
+  sizeCanvas(canvas, width, height, dpr)
   const ctx = canvas.getContext('2d')
   if (!ctx) return null
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0)

@@ -26,4 +26,10 @@ describe('getDpr', () => {
     g.window = { devicePixelRatio: 1.5 }
     expect(getDpr()).toBe(1.5)
   })
+
+  test('accepts a custom cap', () => {
+    g.window = { devicePixelRatio: 3 }
+    expect(getDpr(3)).toBe(3)
+    expect(getDpr(1)).toBe(1)
+  })
 })

@@ -14,6 +14,8 @@ export interface RasterInputs {
   alpha: number
   pointSpacingCss: number
   maxParticles: number
+  /** Density cap applied to devicePixelRatio when rasterizing. */
+  maxDpr: number
   /** Bumped by the component when devicePixelRatio changes (see Dotimation). */
   dprEpoch: number
   /** Bumped when the item's custom web font finishes loading (see useFontEpoch). */
@@ -36,6 +38,7 @@ export function sameRasterInputs(a: RasterInputs, b: RasterInputs): boolean {
     a.alpha === b.alpha &&
     a.pointSpacingCss === b.pointSpacingCss &&
     a.maxParticles === b.maxParticles &&
+    a.maxDpr === b.maxDpr &&
     a.dprEpoch === b.dprEpoch &&
     a.fontEpoch === b.fontEpoch
   )

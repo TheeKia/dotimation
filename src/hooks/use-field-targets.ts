@@ -26,8 +26,9 @@ function runRasterize(inputs: RasterInputs): Promise<FieldTargets> {
     alpha,
     pointSpacingCss,
     maxParticles,
+    maxDpr,
   } = inputs
-  const dpr = getDpr()
+  const dpr = getDpr(maxDpr)
   if (workerRasterAvailable() && isWorkerSafe(item, defaultFontFamily)) {
     return rasterizeViaWorker(
       width,
@@ -47,6 +48,7 @@ function runRasterize(inputs: RasterInputs): Promise<FieldTargets> {
         alpha,
         pointSpacingCss,
         maxParticles,
+        dpr,
       ),
     )
   }
@@ -58,6 +60,7 @@ function runRasterize(inputs: RasterInputs): Promise<FieldTargets> {
     alpha,
     pointSpacingCss,
     maxParticles,
+    dpr,
   )
 }
 
@@ -69,6 +72,7 @@ export function useFieldTargets(
   alpha: number,
   pointSpacingCss: number,
   maxParticles: number,
+  maxDpr: number,
   dprEpoch: number,
   fontEpoch: number,
 ): FieldTargets | null {
@@ -108,6 +112,7 @@ export function useFieldTargets(
       alpha,
       pointSpacingCss,
       maxParticles,
+      maxDpr,
       dprEpoch,
       fontEpoch,
     }
@@ -130,6 +135,7 @@ export function useFieldTargets(
     alpha,
     pointSpacingCss,
     maxParticles,
+    maxDpr,
     dprEpoch,
     fontEpoch,
   ])

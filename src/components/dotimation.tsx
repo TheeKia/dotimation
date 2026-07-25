@@ -17,7 +17,7 @@ import type {
   ParticleField,
 } from '@/types'
 import { useIsomorphicLayoutEffect } from '@/utils/isomorphic-layout-effect'
-import { sizeCanvas } from '@/utils/utils'
+import { getDpr, sizeCanvas } from '@/utils/utils'
 
 type DotimationProps = {
   item: AnimateItem
@@ -48,6 +48,8 @@ type DotimationProps = {
   idle?: IdleBehavior
   /** @default unbounded */
   maxParticles?: number
+  /** Density cap for the canvas backing store (devicePixelRatio is clamped to this). @default 2 */
+  maxDpr?: number
   onStats?: (stats: DotimationStats) => void
 }
 
@@ -67,6 +69,7 @@ export default function Dotimation({
   backend = 'auto',
   idle = 'sleep',
   maxParticles = Number.POSITIVE_INFINITY,
+  maxDpr = 2,
   onStats,
 }: DotimationProps): React.ReactNode {
   const ref = useRef<HTMLCanvasElement>(null)
@@ -112,6 +115,7 @@ export default function Dotimation({
     alpha,
     pointSpacingCss,
     maxParticles,
+    maxDpr,
     dprEpoch,
     fontEpoch,
   )
@@ -142,11 +146,11 @@ export default function Dotimation({
     if (!canvas) return
     const prevW = canvas.width
     const prevH = canvas.height
-    sizeCanvas(canvas, width, height)
+    sizeCanvas(canvas, width, height, getDpr(maxDpr))
     if (canvas.width !== prevW || canvas.height !== prevH) {
       engineRef.current?.resize(canvas.width, canvas.height)
     }
-  }, [width, height, backend, dprEpoch, reducedMotion])
+  }, [width, height, backend, dprEpoch, reducedMotion, maxDpr])
 
   // Create / recreate the engine when the backend config or device pixel
   // ratio changes. Size changes do NOT recreate it (see the resize effect).
@@ -161,6 +165,7 @@ export default function Dotimation({
       canvas,
       sizeRef.current.width,
       sizeRef.current.height,
+      getDpr(maxDpr),
     )
 
     void (async () => {
@@ -211,7 +216,7 @@ export default function Dotimation({
         canvas.width !== Math.round(w * dpr) ||
         canvas.height !== Math.round(h * dpr)
       ) {
-        sizeCanvas(canvas, w, h)
+        sizeCanvas(canvas, w, h, dpr)
         engine.resize(canvas.width, canvas.height)
       }
       fieldRef.current = createField(1024)
@@ -231,7 +236,8 @@ export default function Dotimation({
       engine?.dispose()
       engineRef.current = null
     }
-  }, [backend, dprEpoch, reducedMotion])
+    // maxDpr changes density, which backends bake into dot footprints at init.
+  }, [backend, dprEpoch, reducedMotion, maxDpr])
 
   // dotSize only affects draw-time rendering, so push it to the live backend
   // instead of recreating the engine (which would reset every particle).
@@ -266,7 +272,7 @@ export default function Dotimation({
     // same canvas. Keying on backend + dprEpoch remounts a fresh canvas whenever
     // the engine is recreated, so each incarnation gets a clean slate.
     <canvas
-      key={`${backend}:${dprEpoch}:${reducedMotion ? 'rm' : 'm'}`}
+      key={`${backend}:${dprEpoch}:${maxDpr}:${reducedMotion ? 'rm' : 'm'}`}
       ref={ref}
       className={className}
       style={{ width: `${width}px`, height: `${height}px`, ...style }}
