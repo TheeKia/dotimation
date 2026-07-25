@@ -27,7 +27,15 @@ type DotimationProps = {
   item: AnimateItem
   width: number
   height: number
+  /** React 19 ref to the underlying canvas element. */
+  ref?: React.Ref<HTMLCanvasElement>
+  /** @deprecated Pass `ref` instead (React 19 forwards it as a regular prop). */
   canvasRef?: React.RefObject<HTMLCanvasElement>
+  /**
+   * Accessible name for the canvas (rendered with role="img"). Defaults to the
+   * text content for text items; supply one for image items.
+   */
+  ariaLabel?: string
   className?: string
   style?: Omit<React.CSSProperties, 'width' | 'height'>
   /** @default 'sans-serif' */
@@ -51,8 +59,10 @@ export default function Dotimation({
   item,
   width,
   height,
+  ref: forwardedRef,
   className,
   canvasRef,
+  ariaLabel,
   style,
   defaultFontFamily = 'sans-serif',
   alpha = 128,
@@ -94,6 +104,7 @@ export default function Dotimation({
   const reducedMotionRef = useRef(reducedMotion)
   reducedMotionRef.current = reducedMotion
 
+  useImperativeHandle(forwardedRef, () => ref.current!)
   useImperativeHandle(canvasRef, () => ref.current!)
 
   const targets = useFieldTargets(
@@ -260,6 +271,8 @@ export default function Dotimation({
       ref={ref}
       className={className}
       style={style}
+      role="img"
+      aria-label={ariaLabel ?? (item.type === 'text' ? item.data : undefined)}
     />
   )
 }
