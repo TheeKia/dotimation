@@ -59,6 +59,13 @@ type DotimationProps = SizeProps & {
    * its own motion preference.
    */
   reducedMotion?: boolean
+  /**
+   * How particles are assigned to the next layout's dots. 'swarm' (random
+   * correspondence) reads as a chaotic cloud; 'nearest' pairs each particle
+   * with a nearby destination for a calmer, directed morph. Applies from the
+   * next content change. @default 'swarm'
+   */
+  matching?: 'swarm' | 'nearest'
   onStats?: (stats: DotimationStats) => void
 }
 
@@ -81,6 +88,7 @@ export default function Dotimation({
   maxParticles = Number.POSITIVE_INFINITY,
   maxDpr = 2,
   reducedMotion,
+  matching = 'swarm',
   onStats,
 }: DotimationProps): React.ReactNode {
   // In fill mode the canvas is styled 100%/100% and its CSS content box is the
@@ -123,6 +131,9 @@ export default function Dotimation({
   const reduced = reducedMotion ?? systemReducedMotion
   const reducedRef = useRef(reduced)
   reducedRef.current = reduced
+  // Read at reconcile time; a change applies from the next content change.
+  const matchingRef = useRef(matching)
+  matchingRef.current = matching
 
   useImperativeHandle(forwardedRef, () => ref.current!)
   useImperativeHandle(canvasRef, () => ref.current!)
@@ -267,7 +278,9 @@ export default function Dotimation({
       }
       fieldRef.current = createField(1024)
       if (targetsRef.current) {
-        fieldRef.current = reconcile(fieldRef.current, targetsRef.current)
+        fieldRef.current = reconcile(fieldRef.current, targetsRef.current, {
+          matching: matchingRef.current === 'nearest' ? 'spatial' : 'index',
+        })
         if (reduced) snapField(fieldRef.current)
         engine.setField(fieldRef.current, reduced)
       }
@@ -300,7 +313,9 @@ export default function Dotimation({
   useEffect(() => {
     targetsRef.current = targets
     if (!targets || !engineRef.current) return
-    fieldRef.current = reconcile(fieldRef.current, targets)
+    fieldRef.current = reconcile(fieldRef.current, targets, {
+      matching: matchingRef.current === 'nearest' ? 'spatial' : 'index',
+    })
     // Reduced motion: complete the morph instantly (opacity-only change) and
     // force a full GPU re-upload since the field changed outside reconcile.
     const snap = reducedRef.current

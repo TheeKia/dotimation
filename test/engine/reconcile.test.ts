@@ -267,3 +267,69 @@ describe('reconcile — growth', () => {
     expect(f.targetAlpha[0]).toBe(1)
   })
 })
+
+describe('reconcile spatial matching', () => {
+  test('pairs each particle with its nearby target instead of by index', () => {
+    // Same two positions, listed in REVERSED order in the new targets. Index
+    // matching would send both particles across the canvas; spatial matching
+    // keeps each at its own position (zero travel).
+    let f = reconcile(
+      createField(2),
+      targets([
+        [0, 0],
+        [500, 500],
+      ]),
+    )
+    f = reconcile(
+      f,
+      targets([
+        [500, 500],
+        [0, 0],
+      ]),
+      { matching: 'spatial' },
+    )
+    expect([f.homeX[0], f.homeY[0]]).toEqual([0, 0])
+    expect([f.homeX[1], f.homeY[1]]).toEqual([500, 500])
+    expect(f.active).toBe(2)
+  })
+
+  test('index matching (the default) is unchanged', () => {
+    let f = reconcile(
+      createField(2),
+      targets([
+        [0, 0],
+        [500, 500],
+      ]),
+    )
+    f = reconcile(
+      f,
+      targets([
+        [500, 500],
+        [0, 0],
+      ]),
+    )
+    expect([f.homeX[0], f.homeY[0]]).toEqual([500, 500])
+    expect([f.homeX[1], f.homeY[1]]).toEqual([0, 0])
+  })
+
+  test('spatial growth orders spawn slots by their spawn position', () => {
+    // One particle at the origin grows to three targets. Every slot must end
+    // with targetAlpha 1 and each target claimed exactly once.
+    let f = reconcile(createField(4), targets([[0, 0]]))
+    f = reconcile(
+      f,
+      targets([
+        [0, 0],
+        [100, 100],
+        [200, 200],
+      ]),
+      {
+        matching: 'spatial',
+      },
+    )
+    expect(f.active).toBe(3)
+    const homes = [0, 1, 2].map((i) => `${f.homeX[i]},${f.homeY[i]}`).sort()
+    expect(homes).toEqual(['0,0', '100,100', '200,200'])
+    for (let i = 0; i < 3; i++) expect(f.targetAlpha[i]).toBe(1)
+  })
+})

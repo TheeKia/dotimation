@@ -1,5 +1,6 @@
 import type { FieldTargets, ParticleField } from '@/types'
 import { buildTargetGrid, nearestTarget } from './collapse'
+import { spatialOrder } from './morton'
 import { planReconcile } from './reconcile-plan'
 
 const ARRAY_KEYS = [
@@ -61,20 +62,31 @@ export function growField(
 
 function retargetActive(
   field: ParticleField,
-  i: number,
+  slot: number,
   t: FieldTargets,
+  target: number,
 ): void {
-  field.homeX[i] = t.homeX[i]!
-  field.homeY[i] = t.homeY[i]!
-  field.homeR[i] = t.homeR[i]!
-  field.homeG[i] = t.homeG[i]!
-  field.homeB[i] = t.homeB[i]!
-  field.targetAlpha[i] = 1
+  field.homeX[slot] = t.homeX[target]!
+  field.homeY[slot] = t.homeY[target]!
+  field.homeR[slot] = t.homeR[target]!
+  field.homeG[slot] = t.homeG[target]!
+  field.homeB[slot] = t.homeB[target]!
+  field.targetAlpha[slot] = 1
+}
+
+export interface ReconcileOptions {
+  /**
+   * 'index' pairs slot i with target i — with shuffled targets that reads as a
+   * chaotic swarm. 'spatial' pairs by Morton rank of departure vs. destination
+   * position for locally-coherent (nearest-ish) morphs in O(n log n).
+   */
+  matching?: 'index' | 'spatial'
 }
 
 export function reconcile(
   field: ParticleField,
   targets: FieldTargets,
+  opts: ReconcileOptions = {},
 ): ParticleField {
   const plan = planReconcile(field.active, field.count, targets.count)
   const f = growField(field, Math.max(field.count, plan.count))
@@ -89,7 +101,7 @@ export function reconcile(
       f.g[i] = targets.homeG[i]!
       f.b[i] = targets.homeB[i]!
       f.alpha[i] = 0
-      retargetActive(f, i, targets)
+      retargetActive(f, i, targets, i)
     }
     f.active = plan.active
     f.count = plan.count
@@ -125,7 +137,31 @@ export function reconcile(
     }
   }
 
-  for (let i = 0; i < plan.active; i++) retargetActive(f, i, targets)
+  if (opts.matching === 'spatial' && plan.active > 1) {
+    // Ordering keys must be home-domain (the cross-tier parity rule): a
+    // pre-existing slot departs from its outgoing home; a spawn slot departs
+    // from the spawn position just written to x/y (itself a home value, never
+    // a simulated position).
+    const prevActive = field.active
+    const kx = new Float32Array(plan.active)
+    const ky = new Float32Array(plan.active)
+    for (let i = 0; i < plan.active; i++) {
+      if (i < prevActive) {
+        kx[i] = f.homeX[i]!
+        ky[i] = f.homeY[i]!
+      } else {
+        kx[i] = f.x[i]!
+        ky[i] = f.y[i]!
+      }
+    }
+    const slotOrder = spatialOrder(kx, ky, plan.active)
+    const targetOrder = spatialOrder(targets.homeX, targets.homeY, plan.active)
+    for (let r = 0; r < plan.active; r++) {
+      retargetActive(f, slotOrder[r]!, targets, targetOrder[r]!)
+    }
+  } else {
+    for (let i = 0; i < plan.active; i++) retargetActive(f, i, targets, i)
+  }
   collapseFaders(f, plan.active, plan.count, targets)
   f.active = plan.active
   f.count = plan.count
