@@ -1,5 +1,5 @@
 import type { AnimateItem, FieldTargets } from '@/types'
-import { getCtx } from '@/utils/utils'
+import { getCtx, getDpr } from '@/utils/utils'
 import { drawImage, drawText } from './draw'
 import { emptyFieldTargets, invertPixels, sampleTargets } from './sample'
 
@@ -30,7 +30,7 @@ export async function rasterize(
     drawText(ctx, item, width, height, defaultFontFamily)
   }
 
-  const dpr = Math.min(window.devicePixelRatio || 1, 2)
+  const dpr = getDpr()
   const devW = canvas.width
   const devH = canvas.height
   const img = ctx.getImageData(0, 0, devW, devH)

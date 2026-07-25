@@ -8,6 +8,7 @@ import {
 import { emptyFieldTargets } from '@/raster/sample'
 import { isWorkerSafe } from '@/raster/worker-safe'
 import type { AnimateItem, FieldTargets } from '@/types'
+import { getDpr } from '@/utils/utils'
 
 export function useFieldTargets(
   item: AnimateItem,
@@ -45,7 +46,7 @@ export function useFieldTargets(
       return
     }
 
-    const dpr = Math.min(window.devicePixelRatio || 1, 2)
+    const dpr = getDpr()
     const useWorker =
       workerRasterAvailable() && isWorkerSafe(item, defaultFontFamily)
     const task = useWorker
