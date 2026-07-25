@@ -14,10 +14,12 @@ describe('resolveBackendOrder', () => {
     ).toEqual(['canvas2d'])
   })
 
-  test('explicit GPU choice falls back only to canvas2d safety net', () => {
+  test('explicit request pins the starting tier, keeping everything below as fallback', () => {
+    // Capabilities are ignored for explicit requests — construct/init failure
+    // is the probe — so a machine without WebGPU still lands on WebGL2.
     expect(
-      resolveBackendOrder('webgpu', { webgpu: true, webgl2: true }),
-    ).toEqual(['webgpu', 'canvas2d'])
+      resolveBackendOrder('webgpu', { webgpu: false, webgl2: false }),
+    ).toEqual(['webgpu', 'webgl2', 'canvas2d'])
     expect(
       resolveBackendOrder('webgl2', { webgpu: true, webgl2: true }),
     ).toEqual(['webgl2', 'canvas2d'])
