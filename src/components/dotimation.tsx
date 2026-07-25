@@ -6,6 +6,7 @@ import { createEngine, type Engine } from '@/engine/engine'
 import { createField, reconcile, snapField } from '@/engine/field'
 import { selectBackend } from '@/engine/select'
 import { useFieldTargets } from '@/hooks/use-field-targets'
+import { useFontEpoch } from '@/hooks/use-font-epoch'
 import { useReducedMotion } from '@/hooks/use-reduced-motion'
 import type {
   AnimateItem,
@@ -102,6 +103,7 @@ export default function Dotimation({
   useImperativeHandle(forwardedRef, () => ref.current!)
   useImperativeHandle(canvasRef, () => ref.current!)
 
+  const fontEpoch = useFontEpoch(item, defaultFontFamily)
   const targets = useFieldTargets(
     item,
     width,
@@ -111,6 +113,7 @@ export default function Dotimation({
     pointSpacingCss,
     maxParticles,
     dprEpoch,
+    fontEpoch,
   )
 
   // Watch for devicePixelRatio changes. The media query matches only the

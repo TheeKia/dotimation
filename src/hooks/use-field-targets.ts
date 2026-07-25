@@ -70,6 +70,7 @@ export function useFieldTargets(
   pointSpacingCss: number,
   maxParticles: number,
   dprEpoch: number,
+  fontEpoch: number,
 ): FieldTargets | null {
   const [targets, setTargets] = useState<FieldTargets | null>(null)
   const prev = useRef<RasterInputs | null>(null)
@@ -108,6 +109,7 @@ export function useFieldTargets(
       pointSpacingCss,
       maxParticles,
       dprEpoch,
+      fontEpoch,
     }
     if (prev.current && sameRasterInputs(prev.current, next)) return
     prev.current = next
@@ -129,6 +131,7 @@ export function useFieldTargets(
     pointSpacingCss,
     maxParticles,
     dprEpoch,
+    fontEpoch,
   ])
 
   return targets

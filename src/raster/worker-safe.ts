@@ -16,6 +16,11 @@ const GENERIC_FAMILIES = new Set([
   'fangsong',
 ])
 
+/** True when `family` is a CSS generic (available in workers and never async-loaded). */
+export function isGenericFamily(family: string): boolean {
+  return GENERIC_FAMILIES.has(family.trim().toLowerCase())
+}
+
 /**
  * Whether `item` can be rasterized in a Web Worker without a font discrepancy.
  * Images always can. Text can only when its resolved family is a CSS generic
@@ -33,6 +38,5 @@ export function isWorkerSafe(
   if (item.textColor !== undefined && typeof item.textColor !== 'string') {
     return false
   }
-  const family = (item.fontFamily ?? defaultFontFamily).trim().toLowerCase()
-  return GENERIC_FAMILIES.has(family)
+  return isGenericFamily(item.fontFamily ?? defaultFontFamily)
 }

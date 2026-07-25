@@ -16,6 +16,8 @@ export interface RasterInputs {
   maxParticles: number
   /** Bumped by the component when devicePixelRatio changes (see Dotimation). */
   dprEpoch: number
+  /** Bumped when the item's custom web font finishes loading (see useFontEpoch). */
+  fontEpoch: number
 }
 
 function shallowEqual<T extends object>(a: T, b: T): boolean {
@@ -34,6 +36,7 @@ export function sameRasterInputs(a: RasterInputs, b: RasterInputs): boolean {
     a.alpha === b.alpha &&
     a.pointSpacingCss === b.pointSpacingCss &&
     a.maxParticles === b.maxParticles &&
-    a.dprEpoch === b.dprEpoch
+    a.dprEpoch === b.dprEpoch &&
+    a.fontEpoch === b.fontEpoch
   )
 }
