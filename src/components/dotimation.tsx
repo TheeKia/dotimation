@@ -50,6 +50,12 @@ type DotimationProps = {
   maxParticles?: number
   /** Density cap for the canvas backing store (devicePixelRatio is clamped to this). @default 2 */
   maxDpr?: number
+  /**
+   * Force reduced-motion behavior (morphs snap, no shimmer) on or off. Omit to
+   * follow the OS prefers-reduced-motion setting — pass this when your app has
+   * its own motion preference.
+   */
+  reducedMotion?: boolean
   onStats?: (stats: DotimationStats) => void
 }
 
@@ -70,6 +76,7 @@ export default function Dotimation({
   idle = 'sleep',
   maxParticles = Number.POSITIVE_INFINITY,
   maxDpr = 2,
+  reducedMotion,
   onStats,
 }: DotimationProps): React.ReactNode {
   const ref = useRef<HTMLCanvasElement>(null)
@@ -97,11 +104,13 @@ export default function Dotimation({
   // and rasterization re-key at the new density instead of rendering blurry.
   const [dprEpoch, setDprEpoch] = useState(0)
   // Under reduced motion, morphs snap to their end state (opacity-only
-  // changes) and the shimmer jitter is disabled. A live flip recreates the
-  // engine (rare OS-level event) so the jitter setting takes effect.
-  const reducedMotion = useReducedMotion()
-  const reducedMotionRef = useRef(reducedMotion)
-  reducedMotionRef.current = reducedMotion
+  // changes) and the shimmer jitter is disabled. The prop, when set, overrides
+  // the OS media query. A live flip recreates the engine (rare event) so the
+  // jitter setting takes effect.
+  const systemReducedMotion = useReducedMotion()
+  const reduced = reducedMotion ?? systemReducedMotion
+  const reducedRef = useRef(reduced)
+  reducedRef.current = reduced
 
   useImperativeHandle(forwardedRef, () => ref.current!)
   useImperativeHandle(canvasRef, () => ref.current!)
@@ -139,7 +148,7 @@ export default function Dotimation({
   // live engine, in place, so simulation state survives (the morph continues
   // instead of restarting).
   // biome-ignore lint/correctness/useExhaustiveDependencies(backend): a backend change remounts the canvas (see the key), and the fresh element must be sized again
-  // biome-ignore lint/correctness/useExhaustiveDependencies(reducedMotion): same — it participates in the canvas key
+  // biome-ignore lint/correctness/useExhaustiveDependencies(reduced): same — it participates in the canvas key
   // biome-ignore lint/correctness/useExhaustiveDependencies(dprEpoch): sizeCanvas reads devicePixelRatio, which changed exactly when dprEpoch was bumped
   useIsomorphicLayoutEffect(() => {
     const canvas = ref.current
@@ -150,7 +159,7 @@ export default function Dotimation({
     if (canvas.width !== prevW || canvas.height !== prevH) {
       engineRef.current?.resize(canvas.width, canvas.height)
     }
-  }, [width, height, backend, dprEpoch, reducedMotion, maxDpr])
+  }, [width, height, backend, dprEpoch, reduced, maxDpr])
 
   // Create / recreate the engine when the backend config or device pixel
   // ratio changes. Size changes do NOT recreate it (see the resize effect).
@@ -176,7 +185,7 @@ export default function Dotimation({
         selected = await selectBackend({
           requested: backend,
           dotSize: constructedDotSize,
-          jitter: reducedMotion ? 0 : JITTER_AMOUNT,
+          jitter: reduced ? 0 : JITTER_AMOUNT,
           canvas,
           dpr,
         })
@@ -222,8 +231,8 @@ export default function Dotimation({
       fieldRef.current = createField(1024)
       if (targetsRef.current) {
         fieldRef.current = reconcile(fieldRef.current, targetsRef.current)
-        if (reducedMotion) snapField(fieldRef.current)
-        engine.setField(fieldRef.current, reducedMotion)
+        if (reduced) snapField(fieldRef.current)
+        engine.setField(fieldRef.current, reduced)
       }
       onStatsRef.current?.({
         backend: selected.kind,
@@ -237,7 +246,7 @@ export default function Dotimation({
       engineRef.current = null
     }
     // maxDpr changes density, which backends bake into dot footprints at init.
-  }, [backend, dprEpoch, reducedMotion, maxDpr])
+  }, [backend, dprEpoch, reduced, maxDpr])
 
   // dotSize only affects draw-time rendering, so push it to the live backend
   // instead of recreating the engine (which would reset every particle).
@@ -257,7 +266,7 @@ export default function Dotimation({
     fieldRef.current = reconcile(fieldRef.current, targets)
     // Reduced motion: complete the morph instantly (opacity-only change) and
     // force a full GPU re-upload since the field changed outside reconcile.
-    const snap = reducedMotionRef.current
+    const snap = reducedRef.current
     if (snap) snapField(fieldRef.current)
     engineRef.current.setField(fieldRef.current, snap)
     onStatsRef.current?.({
@@ -272,7 +281,7 @@ export default function Dotimation({
     // same canvas. Keying on backend + dprEpoch remounts a fresh canvas whenever
     // the engine is recreated, so each incarnation gets a clean slate.
     <canvas
-      key={`${backend}:${dprEpoch}:${maxDpr}:${reducedMotion ? 'rm' : 'm'}`}
+      key={`${backend}:${dprEpoch}:${maxDpr}:${reduced ? 'rm' : 'm'}`}
       ref={ref}
       className={className}
       style={{ width: `${width}px`, height: `${height}px`, ...style }}

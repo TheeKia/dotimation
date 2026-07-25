@@ -2,6 +2,7 @@ import type { BackendKind, IdleBehavior } from 'dotimation'
 import type { ConfigApi } from '../../config/use-config'
 import { Field } from '../controls/field'
 import { Segmented } from '../controls/segmented'
+import { Toggle } from '../controls/toggle'
 
 export function BackendControls({ api }: { api: ConfigApi }): React.ReactNode {
   const { config, update } = api
@@ -27,6 +28,12 @@ export function BackendControls({ api }: { api: ConfigApi }): React.ReactNode {
             { label: 'Animate', value: 'animate' },
           ]}
           onChange={(v) => update({ idle: v })}
+        />
+      </Field>
+      <Field label="reduce motion">
+        <Toggle
+          checked={config.reducedMotion}
+          onChange={(v) => update({ reducedMotion: v })}
         />
       </Field>
     </>

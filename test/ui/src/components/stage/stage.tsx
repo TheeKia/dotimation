@@ -66,6 +66,7 @@ export function Stage({
               backend={config.backend}
               idle={config.idle}
               maxParticles={config.maxParticles}
+              reducedMotion={config.reducedMotion || undefined}
               onStats={onStats}
             />
           )}
