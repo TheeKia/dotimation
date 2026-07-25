@@ -6,28 +6,25 @@ import {
   SETTLE_TIME,
   ZETA,
 } from '@/engine/constants'
-import {
-  planReconcile,
-  STATE_FLOATS,
-  TARGET_FLOATS,
-} from '@/engine/reconcile-plan'
+import { planReconcile } from '@/engine/reconcile-plan'
 import { tuneSpring } from '@/engine/settle'
 import type { Backend, ParticleField } from '@/types'
 import {
-  createBuffers,
-  disposeBuffers,
-  type GPUBuffers,
+  ensureScratch,
+  FADE_DURATION_MS,
   packStateInto,
   packTargetsInto,
-} from './buffers'
+  STATE_FLOATS,
+  STATE_STRIDE_BYTES,
+  TARGET_FLOATS,
+} from '../gpu-shared'
+import { createBuffers, disposeBuffers, type GPUBuffers } from './buffers'
 import { acquireGPU } from './device'
 import { createPipelines, type Pipelines } from './pipelines'
 
 export interface WebGPUOptions {
   dotSize: number
 }
-
-const STATE_STRIDE_BYTES = STATE_FLOATS * 4
 
 export function createWebGPUBackend(opts: WebGPUOptions): Backend {
   let device: GPUDevice | null = null
@@ -48,7 +45,6 @@ export function createWebGPUBackend(opts: WebGPUOptions): Backend {
   let stateScratch = new Float32Array(1024 * STATE_FLOATS)
   let targetScratch = new Float32Array(1024 * TARGET_FLOATS)
   const { k, c } = tuneSpring({ settleTime: SETTLE_TIME, zeta: ZETA })
-  const FADE_DURATION_MS = (1 / OPACITY_RATE + 0.15) * 1000
 
   // Bind groups and uniform staging are stable across frames, so they are
   // created once (and rebuilt only when the buffers are recreated) instead of
@@ -136,12 +132,8 @@ export function createWebGPUBackend(opts: WebGPUOptions): Backend {
     buffers = next
     // The cached bind groups referenced the disposed buffers; rebuild them.
     rebuildBindGroups()
-    if (stateScratch.length < next.capacity * STATE_FLOATS) {
-      stateScratch = new Float32Array(next.capacity * STATE_FLOATS)
-    }
-    if (targetScratch.length < next.capacity * TARGET_FLOATS) {
-      targetScratch = new Float32Array(next.capacity * TARGET_FLOATS)
-    }
+    stateScratch = ensureScratch(stateScratch, next.capacity * STATE_FLOATS)
+    targetScratch = ensureScratch(targetScratch, next.capacity * TARGET_FLOATS)
   }
 
   const api: Backend = {

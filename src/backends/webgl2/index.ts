@@ -5,20 +5,19 @@ import {
   SETTLE_TIME,
   ZETA,
 } from '@/engine/constants'
-import {
-  planReconcile,
-  STATE_FLOATS,
-  TARGET_FLOATS,
-} from '@/engine/reconcile-plan'
+import { planReconcile } from '@/engine/reconcile-plan'
 import { tuneSpring } from '@/engine/settle'
 import type { Backend, ParticleField } from '@/types'
 import {
-  createBuffers,
-  disposeBuffers,
-  type GLBuffers,
+  ensureScratch,
+  FADE_DURATION_MS,
   packStateInto,
   packTargetsInto,
-} from './buffers'
+  STATE_FLOATS,
+  STATE_STRIDE_BYTES,
+  TARGET_FLOATS,
+} from '../gpu-shared'
+import { createBuffers, disposeBuffers, type GLBuffers } from './buffers'
 import { getGL } from './gl'
 import { createDrawProgram, type DrawProgram } from './program-draw'
 import { createSimProgram, type SimProgram } from './program-sim'
@@ -26,8 +25,6 @@ import { createSimProgram, type SimProgram } from './program-sim'
 export interface WebGL2Options {
   dotSize: number
 }
-
-const STATE_STRIDE_BYTES = STATE_FLOATS * 4
 
 export function createWebGL2Backend(opts: WebGL2Options): Backend {
   let gl: WebGL2RenderingContext | null = null
@@ -47,10 +44,6 @@ export function createWebGL2Backend(opts: WebGL2Options): Backend {
   let stateScratch = new Float32Array(1024 * STATE_FLOATS)
   let targetScratch = new Float32Array(1024 * TARGET_FLOATS)
   const { k, c } = tuneSpring({ settleTime: SETTLE_TIME, zeta: ZETA })
-  // Faders fade out at OPACITY_RATE; after this long they are invisible and the
-  // tail can be dropped. The Canvas2D backend compacts faders in stepField; the
-  // GPU sim doesn't change count, so we expire them here by elapsed time.
-  const FADE_DURATION_MS = (1 / OPACITY_RATE + 0.15) * 1000
 
   const onLost = (e: Event): void => {
     e.preventDefault()
@@ -118,12 +111,8 @@ export function createWebGL2Backend(opts: WebGL2Options): Backend {
     // The old VAOs referenced the disposed buffers; rebind them to the new ones.
     sim?.setBuffers(next.state[0], next.state[1], next.targets)
     draw?.setBuffers(next.state[0], next.state[1], next.quad)
-    if (stateScratch.length < next.capacity * STATE_FLOATS) {
-      stateScratch = new Float32Array(next.capacity * STATE_FLOATS)
-    }
-    if (targetScratch.length < next.capacity * TARGET_FLOATS) {
-      targetScratch = new Float32Array(next.capacity * TARGET_FLOATS)
-    }
+    stateScratch = ensureScratch(stateScratch, next.capacity * STATE_FLOATS)
+    targetScratch = ensureScratch(targetScratch, next.capacity * TARGET_FLOATS)
   }
 
   function init(canvas: HTMLCanvasElement, devicePixelRatio: number): void {

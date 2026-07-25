@@ -1,4 +1,4 @@
-import { STATE_FLOATS, TARGET_FLOATS } from '@/engine/reconcile-plan'
+import { STATE_FLOATS, TARGET_FLOATS } from '../gpu-shared'
 import { createProgram } from './gl'
 import { SIM_VERT } from './shaders/sim.vert'
 

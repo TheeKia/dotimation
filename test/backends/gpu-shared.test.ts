@@ -1,5 +1,9 @@
 import { describe, expect, test } from 'bun:test'
-import { packStateInto, packTargetsInto } from '@/backends/webgl2/buffers'
+import {
+  ensureScratch,
+  packStateInto,
+  packTargetsInto,
+} from '@/backends/gpu-shared'
 import { createField } from '@/engine/field'
 import type { ParticleField } from '@/types'
 
@@ -48,5 +52,20 @@ describe('packTargetsInto', () => {
     const out = packTargetsInto(new Float32Array(64), f, 2)
     expect(out.length).toBe(12) // 2 slots * 6 floats
     expect(Array.from(out)).toEqual([1, 2, 10, 20, 30, 1, 5, 6, 40, 50, 60, 0])
+  })
+})
+
+describe('ensureScratch', () => {
+  test('returns the same array when already large enough', () => {
+    const s = new Float32Array(16)
+    expect(ensureScratch(s, 8)).toBe(s)
+    expect(ensureScratch(s, 16)).toBe(s)
+  })
+
+  test('allocates a larger array when too small', () => {
+    const s = new Float32Array(8)
+    const next = ensureScratch(s, 9)
+    expect(next).not.toBe(s)
+    expect(next.length).toBe(9)
   })
 })
