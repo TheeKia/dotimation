@@ -1,9 +1,15 @@
 'use client'
 
 import { useEffect, useImperativeHandle, useRef, useState } from 'react'
-import { JITTER_AMOUNT } from '@/engine/constants'
 import { createEngine, type Engine } from '@/engine/engine'
 import { createField, reconcile, snapField } from '@/engine/field'
+import {
+  type DotOptions,
+  type MotionOptions,
+  resolveDots,
+  resolveMotion,
+  toSimParams,
+} from '@/engine/params'
 import { selectBackend } from '@/engine/select'
 import { useFieldTargets } from '@/hooks/use-field-targets'
 import { useFontEpoch } from '@/hooks/use-font-epoch'
@@ -13,7 +19,6 @@ import type {
   BackendKind,
   DotimationStats,
   FieldTargets,
-  IdleBehavior,
   ParticleField,
 } from '@/types'
 import { useIsomorphicLayoutEffect } from '@/utils/isomorphic-layout-effect'
@@ -28,8 +33,6 @@ type DotimationProps = SizeProps & {
   item: AnimateItem
   /** React 19 ref to the underlying canvas element. */
   ref?: React.Ref<HTMLCanvasElement>
-  /** @deprecated Pass `ref` instead (React 19 forwards it as a regular prop). */
-  canvasRef?: React.RefObject<HTMLCanvasElement>
   /**
    * Accessible name for the canvas (rendered with role="img"). Defaults to the
    * text content for text items; supply one for image items.
@@ -39,18 +42,12 @@ type DotimationProps = SizeProps & {
   style?: Omit<React.CSSProperties, 'width' | 'height'>
   /** @default 'sans-serif' */
   defaultFontFamily?: string
-  /** @default 128 */
-  alpha?: number
-  /** @default 2 */
-  pointSpacingCss?: number
-  /** Dot footprint in CSS px (scales with devicePixelRatio). @default 1 */
-  dotSize?: number
+  /** Dot field appearance/sampling. All fields optional; see DotOptions. */
+  dots?: DotOptions
+  /** Motion feel (jitter, settle time, damping, fade). All fields optional. */
+  motion?: MotionOptions
   /** @default 'auto' */
   backend?: BackendKind
-  /** @default 'sleep' */
-  idle?: IdleBehavior
-  /** @default unbounded */
-  maxParticles?: number
   /** Density cap for the canvas backing store (devicePixelRatio is clamped to this). @default 2 */
   maxDpr?: number
   /**
@@ -76,21 +73,21 @@ export default function Dotimation({
   fill,
   ref: forwardedRef,
   className,
-  canvasRef,
   ariaLabel,
   style,
   defaultFontFamily = 'sans-serif',
-  alpha = 128,
-  pointSpacingCss = 2,
-  dotSize = 1,
+  dots,
+  motion,
   backend = 'auto',
-  idle = 'sleep',
-  maxParticles = Number.POSITIVE_INFINITY,
   maxDpr = 2,
   reducedMotion,
   matching = 'swarm',
   onStats,
 }: DotimationProps): React.ReactNode {
+  // Resolved to primitives here; every hook/effect below depends on the
+  // primitive fields, never object identity — inline literals cost nothing.
+  const d = resolveDots(dots)
+  const m = resolveMotion(motion)
   // In fill mode the canvas is styled 100%/100% and its CSS content box is the
   // size authority; until the observer reports, size is 0 (renders nothing).
   const fillMode = fill === true
@@ -106,16 +103,6 @@ export default function Dotimation({
   const kindRef = useRef<DotimationStats['backend']>('canvas2d')
   const onStatsRef = useRef(onStats)
   onStatsRef.current = onStats
-  // dotSize is read at draw time, so it can update live without recreating the
-  // engine. The creation effect reads it through this ref to avoid listing it
-  // as a dependency (which would tear down the engine and reset the field).
-  const dotSizeRef = useRef(dotSize)
-  dotSizeRef.current = dotSize
-  // idle only affects loop policy, so push it to the live engine instead of
-  // recreating it (which would tear down the backend — on WebGPU a full
-  // device re-acquisition). Same ref pattern as dotSize.
-  const idleRef = useRef(idle)
-  idleRef.current = idle
   // Latest size, readable by the creation effect without being a dependency —
   // size changes are applied live via engine.resize, never by recreation.
   const sizeRef = useRef({ width, height })
@@ -131,12 +118,18 @@ export default function Dotimation({
   const reduced = reducedMotion ?? systemReducedMotion
   const reducedRef = useRef(reduced)
   reducedRef.current = reduced
+  // Sim params are read at step/draw time, so they update live without
+  // recreating the engine. The creation effect reads them through this ref to
+  // avoid listing them as dependencies (which would tear down the engine and
+  // reset the field).
+  const simParams = toSimParams(m, d.size, reduced)
+  const simParamsRef = useRef(simParams)
+  simParamsRef.current = simParams
   // Read at reconcile time; a change applies from the next content change.
   const matchingRef = useRef(matching)
   matchingRef.current = matching
 
   useImperativeHandle(forwardedRef, () => ref.current!)
-  useImperativeHandle(canvasRef, () => ref.current!)
 
   // Fill mode: track the canvas's CSS content box. Deps mirror the canvas key
   // so a remounted element is re-observed. No feedback loop: the observer
@@ -169,9 +162,9 @@ export default function Dotimation({
     width,
     height,
     defaultFontFamily,
-    alpha,
-    pointSpacingCss,
-    maxParticles,
+    d.threshold,
+    d.spacing,
+    d.max,
     maxDpr,
     dprEpoch,
     fontEpoch,
@@ -226,14 +219,11 @@ export default function Dotimation({
     )
 
     void (async () => {
-      const constructedDotSize = dotSizeRef.current
-      const constructedIdle = idleRef.current
       let selected: Awaited<ReturnType<typeof selectBackend>>
       try {
         selected = await selectBackend({
           requested: backend,
-          dotSize: constructedDotSize,
-          jitter: reduced ? 0 : JITTER_AMOUNT,
+          params: simParamsRef.current,
           canvas,
           dpr,
         })
@@ -255,18 +245,12 @@ export default function Dotimation({
         backend: selected.backend,
         canvas,
         dpr,
-        idle: constructedIdle,
+        params: simParamsRef.current,
       })
       engineRef.current = engine
-      // dotSize may have changed while the backend was initializing; the
-      // setDotSize effect ran against a null engineRef and was dropped.
-      if (dotSizeRef.current !== constructedDotSize) {
-        engine.setDotSize(dotSizeRef.current)
-      }
-      // Likewise idle; its effect was likewise dropped.
-      if (idleRef.current !== constructedIdle) {
-        engine.setIdle(idleRef.current)
-      }
+      // Params may have changed while the backend was initializing; the live
+      // effect ran against a null engineRef and was dropped. Re-applying is cheap.
+      engine.setParams(simParamsRef.current)
       // So may the size; the resize effect was likewise dropped.
       const { width: w, height: h } = sizeRef.current
       if (
@@ -298,16 +282,24 @@ export default function Dotimation({
     // maxDpr changes density, which backends bake into dot footprints at init.
   }, [backend, dprEpoch, reduced, maxDpr])
 
-  // dotSize only affects draw-time rendering, so push it to the live backend
-  // instead of recreating the engine (which would reset every particle).
+  // Motion/dot-size changes are pushed to the live engine — never a recreation.
+  // Deps are the resolved primitives, not `d`/`m` object identity or
+  // simParamsRef, so each field (not the whole `m`/`d` object) is read here —
+  // matching the dependency list exactly.
   useEffect(() => {
-    engineRef.current?.setDotSize(dotSize)
-  }, [dotSize])
-
-  // idle only affects loop policy; push it live (see idleRef above).
-  useEffect(() => {
-    engineRef.current?.setIdle(idle)
-  }, [idle])
+    engineRef.current?.setParams(
+      toSimParams(
+        {
+          jitter: m.jitter,
+          settleTime: m.settleTime,
+          damping: m.damping,
+          fade: m.fade,
+        },
+        d.size,
+        reduced,
+      ),
+    )
+  }, [d.size, m.jitter, m.settleTime, m.damping, m.fade, reduced])
 
   // Push new targets into the live field whenever rasterization produces them.
   useEffect(() => {

@@ -1,24 +1,26 @@
-import type { Backend, IdleBehavior, ParticleField } from '@/types'
+import type { Backend, ParticleField } from '@/types'
 import { accumulate, FIXED_DT } from './clock'
-import { OPACITY_RATE, SETTLE_TIME } from './constants'
+import type { SimParams } from './params'
 import { computeSettleDuration } from './settle'
 
 export interface EngineOptions {
   backend: Backend
   canvas: HTMLCanvasElement
   dpr: number
-  idle: IdleBehavior
+  params: SimParams
 }
-
-const SETTLE_SECONDS = computeSettleDuration(SETTLE_TIME, OPACITY_RATE)
 
 export interface Engine {
   /** Push a reconciled field; `full` is forwarded to Backend.uploadField. */
   setField(field: ParticleField, full?: boolean): void
-  /** Update the dot footprint live (read at draw time) without recreating the engine. */
-  setDotSize(dotSize: number): void
-  /** Switch idle behavior live (read by the loop each frame) without recreating the engine. */
-  setIdle(next: IdleBehavior): void
+  /**
+   * Apply new sim params live (dot size, jitter, spring, fade) without
+   * recreating anything. Also re-derives the loop policy: jitter > 0 means
+   * the shimmer must stay visible, so the loop runs whenever on-screen and
+   * the field has content; jitter === 0 (or an empty field) means nothing
+   * moves once settled, so the loop sleeps.
+   */
+  setParams(params: SimParams): void
   /**
    * Resize in place without tearing down the engine — the component calls this
    * on width/height changes so simulation state survives across resizes.
@@ -29,7 +31,17 @@ export interface Engine {
 
 export function createEngine(opts: EngineOptions): Engine {
   const { backend, canvas } = opts
-  let idle = opts.idle
+  let settleSeconds = computeSettleDuration(
+    opts.params.settleTime,
+    opts.params.opacityRate,
+  )
+  // `continuous` is what jitter alone asks for; the loop policy everywhere
+  // below reads `continuous && hasContent` — an empty ACTIVE layout (no
+  // item.data, or fill mode before the first measure) has nothing to
+  // shimmer, so it must go through the ordinary settle/sleep path
+  // regardless of jitter (see setField for why `active`, not `count`).
+  let continuous = opts.params.jitter > 0
+  let hasContent = false
   let rafId = 0
   let running = false
   let last = 0
@@ -45,10 +57,15 @@ export function createEngine(opts: EngineOptions): Engine {
     // Draw unconditionally while running: a skipped present is what made
     // cleared-buffer flicker possible on high-refresh displays, and skipping
     // was only ever worth it when preserveDrawingBuffer paid for it on every
-    // real present. The loop only runs during the awake window, so the extra
-    // draws are bounded and cheap.
+    // real present.
     backend.draw()
-    if (idle === 'sleep' && (now >= awakeUntil || backend.settled?.())) {
+    // With jitter active and content present, the field never converges (by
+    // design), so the settled() early-sleep only applies when jitter === 0
+    // or the field is empty (nothing to shimmer either way).
+    if (
+      !(continuous && hasContent) &&
+      (now >= awakeUntil || backend.settled?.())
+    ) {
       stop()
       return
     }
@@ -70,7 +87,7 @@ export function createEngine(opts: EngineOptions): Engine {
   }
 
   const wake = (): void => {
-    awakeUntil = performance.now() + SETTLE_SECONDS * 1000
+    awakeUntil = performance.now() + settleSeconds * 1000
     if (!running && visible) start()
   }
 
@@ -79,9 +96,10 @@ export function createEngine(opts: EngineOptions): Engine {
       ? new IntersectionObserver((entries) => {
           visible = entries[0]?.isIntersecting ?? true
           if (visible) {
-            // In 'animate' mode the loop must run whenever on-screen; in
-            // 'sleep' mode only resume if we're still inside the wake window.
-            if (idle === 'animate' || performance.now() < awakeUntil) start()
+            // Continuous (jitter > 0 with content present) must run whenever
+            // on-screen; otherwise only resume if still inside the wake window.
+            if ((continuous && hasContent) || performance.now() < awakeUntil)
+              start()
           } else {
             stop()
           }
@@ -91,21 +109,30 @@ export function createEngine(opts: EngineOptions): Engine {
 
   return {
     setField(field, full): void {
+      // Track content BEFORE uploading/waking, and gate on `active` (the
+      // live layout), not `count`: `count` includes in-flight faders, so an
+      // empty layout that still has faders (e.g. content -> empty) would
+      // stay "stale-true" with count and never let the loop sleep once the
+      // fade completes. An empty ACTIVE layout means nothing to shimmer; any
+      // faders still ride the settle window below (wake() arms it, and
+      // settled() — src/engine/rest.ts — stays false while a fader's alpha
+      // is still above threshold, so the fade finishes on the sleep path
+      // before the loop stops itself). A field that just became non-empty
+      // must be eligible for the continuous path immediately (wake() below
+      // starts the loop if so).
+      hasContent = field.active > 0
       backend.uploadField(field, full)
       wake()
     },
-    setDotSize(dotSize): void {
-      backend.setDotSize(dotSize)
-      wake()
-    },
-    setIdle(next): void {
-      if (next === idle) return
-      idle = next
-      // 'animate' must run whenever visible; 'sleep' gets one settle window
-      // so an in-flight morph finishes before the loop stops itself.
-      if (idle === 'animate') {
+    setParams(next): void {
+      backend.setParams(next)
+      settleSeconds = computeSettleDuration(next.settleTime, next.opacityRate)
+      continuous = next.jitter > 0
+      if (continuous && hasContent) {
         if (visible && !running) start()
       } else {
+        // One settle window so an in-flight morph (or a fresh dot size)
+        // paints before the loop stops itself.
         wake()
       }
     },

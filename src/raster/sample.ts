@@ -41,12 +41,12 @@ export function sampleTargets(
   devW: number,
   devH: number,
   dpr: number,
-  pointSpacingCss: number,
-  alpha: number,
+  spacingCss: number,
+  threshold: number,
   rand: () => number = fastRand,
-  maxParticles: number = Number.POSITIVE_INFINITY,
+  max: number = Number.POSITIVE_INFINITY,
 ): FieldTargets {
-  const step = Math.max(1, Math.round(pointSpacingCss * dpr))
+  const step = Math.max(1, Math.round(spacingCss * dpr))
   // The grid has at most ceil(devW/step) * ceil(devH/step) cells, so the
   // candidate arrays are preallocated to that bound and filled with a cursor —
   // avoiding boxed number[] growth and the GC churn of push() on large images.
@@ -61,7 +61,7 @@ export function sampleTargets(
   for (let yDev = 0; yDev < devH; yDev += step) {
     for (let xDev = 0; xDev < devW; xDev += step) {
       const idx = (yDev * devW + xDev) * 4
-      if (pixels[idx + 3]! > alpha) {
+      if (pixels[idx + 3]! > threshold) {
         xs[n] = xDev / dpr
         ys[n] = yDev / dpr
         rs[n] = pixels[idx]!
@@ -71,7 +71,7 @@ export function sampleTargets(
       }
     }
   }
-  const keep = Math.min(n, Math.max(0, Math.floor(maxParticles)))
+  const keep = Math.min(n, Math.max(0, Math.floor(max)))
   const order = new Uint32Array(n)
   for (let i = 0; i < n; i++) order[i] = i
   // Partial Fisher–Yates: only the first `keep` picks are needed to draw a

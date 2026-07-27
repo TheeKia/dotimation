@@ -1,4 +1,4 @@
-import type { BackendKind, IdleBehavior } from 'dotimation'
+import type { BackendKind } from 'dotimation'
 
 export type TextItemConfig = {
   type: 'text'
@@ -30,13 +30,16 @@ export type BgKind = 'dark' | 'light' | 'checker'
 export type PlaygroundConfig = {
   slots: Record<SlotId, ItemConfig>
   active: SlotId
-  dotSize: number
-  pointSpacingCss: number
-  alpha: number
+  size: number
+  spacing: number
+  threshold: number
+  max: number | undefined
   defaultFontFamily: string
   backend: BackendKind
-  idle: IdleBehavior
-  maxParticles: number | undefined
+  jitter: number
+  settleTime: number
+  damping: number
+  fade: number
   reducedMotion: boolean
   stageSize: StageSize
   bg: BgKind

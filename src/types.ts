@@ -1,3 +1,7 @@
+import type { SimParams } from '@/engine/params'
+
+export type { DotOptions, MotionOptions, SimParams } from '@/engine/params'
+
 export type AnimateItem =
   | {
       type: 'text'
@@ -16,9 +20,6 @@ export type AnimateItem =
 
 /** Which rendering/simulation backend to use. `'auto'` picks the best available. */
 export type BackendKind = 'auto' | 'webgpu' | 'webgl2' | 'canvas2d'
-
-/** Whether the animation stops the rAF loop once particles settle. */
-export type IdleBehavior = 'sleep' | 'animate'
 
 /** Rasterizer output: the desired layout (home positions/colors only). */
 export interface FieldTargets {
@@ -69,8 +70,11 @@ export interface Backend {
    * e.g. snapField under prefers-reduced-motion.
    */
   uploadField(field: ParticleField, full?: boolean): void
-  /** Update the dot footprint (in CSS px). Read at draw time; no re-init needed. */
-  setDotSize(dotSize: number): void
+  /**
+   * Apply new sim params live; read at step/draw time. Carries dot size,
+   * jitter, spring k/c, settleTime, and the color/opacity ease rates.
+   */
+  setParams(params: SimParams): void
   step(dt: number): void
   draw(): void
   /** Optional: true when the field has visibly converged, so the engine may sleep early. */

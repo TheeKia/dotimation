@@ -2,34 +2,26 @@ import { createCanvas2DBackend } from '@/backends/canvas2d'
 import type { Backend, BackendKind } from '@/types'
 import { detectCapabilities } from './backend'
 import { type ConcreteBackend, resolveBackendOrder } from './cascade'
+import type { SimParams } from './params'
 
 export interface SelectOptions {
   requested: BackendKind
-  dotSize: number
-  /** Shimmer amplitude in px per step (0 disables, e.g. reduced motion). */
-  jitter: number
+  params: SimParams
   canvas: HTMLCanvasElement
   dpr: number
 }
 
 async function construct(
   kind: ConcreteBackend,
-  dotSize: number,
-  jitter: number,
+  params: SimParams,
 ): Promise<Backend> {
   if (kind === 'webgpu') {
-    return (await import('@/backends/webgpu')).createWebGPUBackend({
-      dotSize,
-      jitter,
-    })
+    return (await import('@/backends/webgpu')).createWebGPUBackend(params)
   }
   if (kind === 'webgl2') {
-    return (await import('@/backends/webgl2')).createWebGL2Backend({
-      dotSize,
-      jitter,
-    })
+    return (await import('@/backends/webgl2')).createWebGL2Backend(params)
   }
-  return createCanvas2DBackend({ dotSize, jitter })
+  return createCanvas2DBackend(params)
 }
 
 /**
@@ -53,7 +45,7 @@ export async function selectBackend(
   for (const kind of order) {
     let be: Backend | undefined
     try {
-      be = await construct(kind, opts.dotSize, opts.jitter)
+      be = await construct(kind, opts.params)
       await be.init(opts.canvas, opts.dpr)
       return { backend: be, kind }
     } catch (err) {

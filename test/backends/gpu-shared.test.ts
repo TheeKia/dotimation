@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import {
   ensureScratch,
+  fadeDurationMs,
   packStateInto,
   packTargetsInto,
 } from '@/backends/gpu-shared'
@@ -67,5 +68,12 @@ describe('ensureScratch', () => {
     const next = ensureScratch(s, 9)
     expect(next).not.toBe(s)
     expect(next.length).toBe(9)
+  })
+})
+
+describe('fadeDurationMs', () => {
+  test('is fade time plus 150ms margin, in ms', () => {
+    expect(fadeDurationMs(2)).toBe((1 / 2 + 0.15) * 1000)
+    expect(fadeDurationMs(4)).toBe((1 / 4 + 0.15) * 1000)
   })
 })

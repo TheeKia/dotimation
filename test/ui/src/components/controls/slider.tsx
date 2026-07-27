@@ -4,12 +4,15 @@ export function Slider({
   max,
   step = 1,
   onChange,
+  'aria-label': ariaLabel,
 }: {
   value: number
   min: number
   max: number
   step?: number
   onChange: (v: number) => void
+  /** e2e hook: lets the smoke suite locate a specific slider precisely. */
+  'aria-label'?: string
 }): React.ReactNode {
   return (
     <div className="flex w-40 items-center gap-2">
@@ -19,6 +22,7 @@ export function Slider({
         max={max}
         step={step}
         value={value}
+        aria-label={ariaLabel}
         onChange={(e) => onChange(Number(e.target.value))}
         className="min-w-0 flex-1"
       />

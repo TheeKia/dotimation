@@ -1,11 +1,10 @@
 import { FIXED_DT, MAX_STEPS_PER_FRAME } from '@/engine/clock'
-import { COLOR_RATE, OPACITY_RATE, SETTLE_TIME, ZETA } from '@/engine/constants'
+import type { SimParams } from '@/engine/params'
 import { planReconcile } from '@/engine/reconcile-plan'
-import { tuneSpring } from '@/engine/settle'
 import type { Backend, ParticleField } from '@/types'
 import {
   ensureScratch,
-  FADE_DURATION_MS,
+  fadeDurationMs,
   packStateInto,
   packTargetsInto,
   STATE_FLOATS,
@@ -16,13 +15,7 @@ import { createBuffers, disposeBuffers, type GPUBuffers } from './buffers'
 import { acquireGPU } from './device'
 import { createPipelines, type Pipelines } from './pipelines'
 
-export interface WebGPUOptions {
-  dotSize: number
-  /** Shimmer amplitude in px per step (0 disables, e.g. reduced motion). */
-  jitter: number
-}
-
-export function createWebGPUBackend(opts: WebGPUOptions): Backend {
+export function createWebGPUBackend(initial: SimParams): Backend {
   let device: GPUDevice | null = null
   let context: GPUCanvasContext | null = null
   let canvasEl: HTMLCanvasElement | null = null
@@ -37,11 +30,9 @@ export function createWebGPUBackend(opts: WebGPUOptions): Backend {
   let active = 0
   let lost = false
   let lastUpload = 0
-  let dotSize = opts.dotSize
-  const jitter = opts.jitter
+  let p = initial
   let stateScratch = new Float32Array(1024 * STATE_FLOATS)
   let targetScratch = new Float32Array(1024 * TARGET_FLOATS)
-  const { k, c } = tuneSpring({ settleTime: SETTLE_TIME, zeta: ZETA })
 
   // Bind groups and uniform staging are stable across frames, so they are
   // created once (and rebuilt only when the buffers are recreated) instead of
@@ -191,14 +182,17 @@ export function createWebGPUBackend(opts: WebGPUOptions): Backend {
       count = plan.count
       lastUpload = performance.now()
     },
-    setDotSize(next: number): void {
-      dotSize = next
+    setParams(next: SimParams): void {
+      p = next
       renderUniformDirty = true
     },
     step(dt: number): void {
       if (!device || !buffers || !pipelines || !simBindGroups || lost) return
       if (count <= 0) return
-      if (count > active && performance.now() - lastUpload > FADE_DURATION_MS) {
+      if (
+        count > active &&
+        performance.now() - lastUpload > fadeDurationMs(p.opacityRate)
+      ) {
         count = active
       }
       // Record intent only — the GPU work is flushed once in draw() so the whole
@@ -224,11 +218,11 @@ export function createWebGPUBackend(opts: WebGPUOptions): Backend {
 
       if (steps > 0 && count > 0 && simBindGroups) {
         simU[0] = stepDt
-        simU[1] = k
-        simU[2] = c
-        simU[3] = COLOR_RATE
-        simU[4] = OPACITY_RATE
-        simU[5] = jitter
+        simU[1] = p.k
+        simU[2] = p.c
+        simU[3] = p.colorRate
+        simU[4] = p.opacityRate
+        simU[5] = p.jitter
         simU[7] = count
         // One slice per step, each with a fresh jitter seed (matching the
         // other tiers' per-step reseed); the passes select their slice via
@@ -246,7 +240,7 @@ export function createWebGPUBackend(opts: WebGPUOptions): Backend {
         renderU[0] = devW
         renderU[1] = devH
         renderU[2] = dpr
-        renderU[3] = dotSize
+        renderU[3] = p.dotSize
         device.queue.writeBuffer(pipelines.renderUniform, 0, renderU)
         renderUniformDirty = false
       }

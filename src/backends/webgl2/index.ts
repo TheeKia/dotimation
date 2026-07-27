@@ -1,10 +1,9 @@
-import { COLOR_RATE, OPACITY_RATE, SETTLE_TIME, ZETA } from '@/engine/constants'
+import type { SimParams } from '@/engine/params'
 import { planReconcile } from '@/engine/reconcile-plan'
-import { tuneSpring } from '@/engine/settle'
 import type { Backend, ParticleField } from '@/types'
 import {
   ensureScratch,
-  FADE_DURATION_MS,
+  fadeDurationMs,
   packStateInto,
   packTargetsInto,
   STATE_FLOATS,
@@ -16,13 +15,7 @@ import { getGL } from './gl'
 import { createDrawProgram, type DrawProgram } from './program-draw'
 import { createSimProgram, type SimProgram } from './program-sim'
 
-export interface WebGL2Options {
-  dotSize: number
-  /** Shimmer amplitude in px per step (0 disables, e.g. reduced motion). */
-  jitter: number
-}
-
-export function createWebGL2Backend(opts: WebGL2Options): Backend {
+export function createWebGL2Backend(initial: SimParams): Backend {
   let gl: WebGL2RenderingContext | null = null
   let canvasEl: HTMLCanvasElement | null = null
   let buffers: GLBuffers | null = null
@@ -35,12 +28,10 @@ export function createWebGL2Backend(opts: WebGL2Options): Backend {
   let active = 0
   let lost = false
   let lastUpload = 0
-  let dotSize = opts.dotSize
-  const jitter = opts.jitter
+  let p = initial
   let lastField: ParticleField | null = null
   let stateScratch = new Float32Array(1024 * STATE_FLOATS)
   let targetScratch = new Float32Array(1024 * TARGET_FLOATS)
-  const { k, c } = tuneSpring({ settleTime: SETTLE_TIME, zeta: ZETA })
 
   const onLost = (e: Event): void => {
     e.preventDefault()
@@ -187,24 +178,27 @@ export function createWebGL2Backend(opts: WebGL2Options): Backend {
       count = plan.count
       lastUpload = performance.now()
     },
-    setDotSize(next: number): void {
-      dotSize = next
+    setParams(next: SimParams): void {
+      p = next
     },
     step(dt: number): void {
       if (!gl || !buffers || !sim || lost || count <= 0) return
       // Drop fully-faded faders (the GPU sim never shrinks count itself).
-      if (count > active && performance.now() - lastUpload > FADE_DURATION_MS) {
+      if (
+        count > active &&
+        performance.now() - lastUpload > fadeDurationMs(p.opacityRate)
+      ) {
         count = active
       }
       const b = buffers
       // Jitter every step, matching the Canvas2D backend's shimmer frequency.
       sim.step(b.read, count, {
         dt,
-        k,
-        c,
-        colorRate: COLOR_RATE,
-        opacityRate: OPACITY_RATE,
-        jitter,
+        k: p.k,
+        c: p.c,
+        colorRate: p.colorRate,
+        opacityRate: p.opacityRate,
+        jitter: p.jitter,
         seed: (Math.random() * 0x100000000) >>> 0,
       })
       b.read = (b.read ^ 1) as 0 | 1
@@ -219,7 +213,7 @@ export function createWebGL2Backend(opts: WebGL2Options): Backend {
         devW,
         devH,
         dpr,
-        dotSize,
+        dotSize: p.dotSize,
       })
     },
     resize(w: number, h: number): void {

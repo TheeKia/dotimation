@@ -33,9 +33,9 @@ interface RasterRequest {
   width: number
   height: number
   defaultFontFamily: string
-  alpha: number
-  pointSpacingCss: number
-  maxParticles: number
+  threshold: number
+  spacingCss: number
+  max: number
   dpr: number
 }
 
@@ -64,10 +64,10 @@ async function run(req: RasterRequest): Promise<FieldTargets> {
     w,
     h,
     req.dpr,
-    req.pointSpacingCss,
-    req.alpha,
+    req.spacingCss,
+    req.threshold,
     undefined,
-    req.maxParticles,
+    req.max,
   )
 }
 

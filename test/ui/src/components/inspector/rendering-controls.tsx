@@ -18,28 +18,28 @@ export function RenderingControls({
   const { config, update } = api
   return (
     <>
-      <Field label="dotSize">
+      <Field label="size">
         <Slider
-          value={config.dotSize}
+          value={config.size}
           min={1}
           max={6}
-          onChange={(v) => update({ dotSize: v })}
+          onChange={(v) => update({ size: v })}
         />
       </Field>
       <Field label="spacing">
         <Slider
-          value={config.pointSpacingCss}
+          value={config.spacing}
           min={1}
           max={8}
-          onChange={(v) => update({ pointSpacingCss: v })}
+          onChange={(v) => update({ spacing: v })}
         />
       </Field>
-      <Field label="alpha">
+      <Field label="threshold">
         <Slider
-          value={config.alpha}
+          value={config.threshold}
           min={0}
           max={255}
-          onChange={(v) => update({ alpha: v })}
+          onChange={(v) => update({ threshold: v })}
         />
       </Field>
       <Field label="defaultFont">
@@ -47,6 +47,43 @@ export function RenderingControls({
           value={config.defaultFontFamily}
           options={FONT_FAMILIES}
           onChange={(v) => update({ defaultFontFamily: v })}
+        />
+      </Field>
+      <Field label="jitter">
+        <Slider
+          aria-label="jitter"
+          value={config.jitter}
+          min={0}
+          max={4}
+          step={0.1}
+          onChange={(v) => update({ jitter: v })}
+        />
+      </Field>
+      <Field label="settleTime">
+        <Slider
+          value={config.settleTime}
+          min={0.2}
+          max={3}
+          step={0.05}
+          onChange={(v) => update({ settleTime: v })}
+        />
+      </Field>
+      <Field label="damping">
+        <Slider
+          value={config.damping}
+          min={0.3}
+          max={1}
+          step={0.05}
+          onChange={(v) => update({ damping: v })}
+        />
+      </Field>
+      <Field label="fade">
+        <Slider
+          value={config.fade}
+          min={0.5}
+          max={8}
+          step={0.5}
+          onChange={(v) => update({ fade: v })}
         />
       </Field>
     </>
