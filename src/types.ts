@@ -1,5 +1,7 @@
 import type { SimParams } from '@/engine/params'
 
+export type { DotOptions, MotionOptions } from '@/engine/params'
+
 export type AnimateItem =
   | {
       type: 'text'
