@@ -19,7 +19,6 @@ Bun is the only supported toolchain (`bun.lock`, `bunfig.toml`). Do not use npm/
 - `bun run lint` / `bun run lint:fix` — Biome check / autofix
 - `bun test` — run tests; `bun test path/to/file.test.ts` for a single file; `bun test -t "name"` for a single test; `bun run test:watch`, `bun run test:coverage`
 - `bun run test:e2e` — headless-Chromium smoke of the playground (`test/e2e/smoke.e2e.ts`; named `.e2e.ts` so `bun test` skips it). Boots Vite itself; needs `bunx playwright install chromium` once. Covers the DOM/GPU shells unit tests can't: backend cascade, canvas sizing/a11y, pixel output, reduced motion, and the jitter-derived loop policy (shimmer persists indefinitely while `jitter > 0`, sleeps after settle when `jitter === 0`, a live jitter change never remounts the canvas). The playground exposes `motion` as sliders (jitter/settleTime/damping/fade) alongside the dot/backend controls; its `use-config` hook also honors an e2e-only `?jitter=` query override so the suite can pin a starting value deterministically. Runs in CI as its own ubuntu job.
-- `bun run release` — `bumpp` bumps version, commits, tags, and pushes; the `v*` tag triggers `.github/workflows/release.yml` which publishes to npm
 
 A `simple-git-hooks` pre-commit hook runs `lint` + `type-check`. CI (`ci.yml`) runs build → type-check → lint → test on Linux/macOS/Windows.
 
