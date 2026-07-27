@@ -59,13 +59,20 @@ export function Stage({
               item={item}
               width={width}
               height={height}
-              dotSize={config.dotSize}
-              pointSpacingCss={config.pointSpacingCss}
-              alpha={config.alpha}
+              dots={{
+                size: config.size,
+                spacing: config.spacing,
+                threshold: config.threshold,
+                max: config.max,
+              }}
+              motion={{
+                jitter: config.jitter,
+                settleTime: config.settleTime,
+                damping: config.damping,
+                fade: config.fade,
+              }}
               defaultFontFamily={config.defaultFontFamily}
               backend={config.backend}
-              idle={config.idle}
-              maxParticles={config.maxParticles}
               reducedMotion={config.reducedMotion || undefined}
               onStats={onStats}
             />

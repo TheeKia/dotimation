@@ -9,23 +9,23 @@ export function PerformanceControls({
   api: ConfigApi
 }): React.ReactNode {
   const { config, update, reset } = api
-  const capped = config.maxParticles !== undefined
+  const capped = config.max !== undefined
   return (
     <>
       <Field label="cap dots">
         <Toggle
           checked={capped}
-          onChange={(v) => update({ maxParticles: v ? 20000 : undefined })}
+          onChange={(v) => update({ max: v ? 20000 : undefined })}
         />
       </Field>
       {capped && (
-        <Field label="maxParticles">
+        <Field label="max">
           <Slider
-            value={config.maxParticles ?? 20000}
+            value={config.max ?? 20000}
             min={1000}
             max={50000}
             step={1000}
-            onChange={(v) => update({ maxParticles: v })}
+            onChange={(v) => update({ max: v })}
           />
         </Field>
       )}

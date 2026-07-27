@@ -4,18 +4,33 @@ import type { ItemConfig, PlaygroundConfig } from './types'
 
 const STORAGE_KEY = 'dotimation-playground:v1'
 
+/**
+ * e2e hook: `?jitter=0` (or any number) overrides the persisted/default
+ * jitter value at load time. The playground has no other way to force a
+ * specific jitter on first paint (it's a live-editable slider, not a URL
+ * concern), so the smoke suite drives the "jitter 0 sleeps" / "shimmer
+ * persists" scenarios this way. Not otherwise part of the playground's UX.
+ */
+function applyQueryOverrides(config: PlaygroundConfig): PlaygroundConfig {
+  if (typeof location === 'undefined') return config
+  const jitterParam = new URLSearchParams(location.search).get('jitter')
+  if (jitterParam === null) return config
+  const jitter = Number(jitterParam)
+  return Number.isFinite(jitter) ? { ...config, jitter } : config
+}
+
 function load(): PlaygroundConfig {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
-    if (!raw) return DEFAULT_CONFIG
+    if (!raw) return applyQueryOverrides(DEFAULT_CONFIG)
     const parsed = JSON.parse(raw) as Partial<PlaygroundConfig>
-    return {
+    return applyQueryOverrides({
       ...DEFAULT_CONFIG,
       ...parsed,
       slots: { ...DEFAULT_CONFIG.slots, ...parsed.slots },
-    }
+    })
   } catch {
-    return DEFAULT_CONFIG
+    return applyQueryOverrides(DEFAULT_CONFIG)
   }
 }
 
