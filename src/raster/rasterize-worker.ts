@@ -105,9 +105,9 @@ export function rasterizeViaWorker(
   height: number,
   item: AnimateItem,
   defaultFontFamily: string,
-  alpha: number,
-  pointSpacingCss: number,
-  maxParticles: number,
+  threshold: number,
+  spacingCss: number,
+  max: number,
   dpr: number,
 ): Promise<FieldTargets> {
   const w = getWorker()
@@ -126,9 +126,9 @@ export function rasterizeViaWorker(
       width,
       height,
       defaultFontFamily,
-      alpha,
-      pointSpacingCss,
-      maxParticles,
+      threshold,
+      spacingCss,
+      max,
       dpr,
     })
   })

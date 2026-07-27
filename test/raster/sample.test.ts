@@ -22,9 +22,9 @@ describe('sampleTargets', () => {
     expect(t.homeB[0]).toBe(0)
   })
 
-  test('skips pixels at or below the alpha threshold', () => {
+  test('skips pixels at or below the threshold', () => {
     const p = img()
-    p[(0 * 2 + 1) * 4 + 3] = 128 // exactly threshold → excluded (> alpha)
+    p[(0 * 2 + 1) * 4 + 3] = 128 // exactly threshold → excluded (> threshold)
     expect(sampleTargets(p, 2, 2, 1, 1, 128, () => 0).count).toBe(0)
   })
 
@@ -38,7 +38,7 @@ describe('sampleTargets', () => {
   })
 })
 
-describe('sampleTargets maxParticles', () => {
+describe('sampleTargets max', () => {
   // 4x4 fully-opaque image → 16 candidate pixels at step 1.
   function opaque(): Uint8ClampedArray {
     const p = new Uint8ClampedArray(4 * 4 * 4)
@@ -46,7 +46,7 @@ describe('sampleTargets maxParticles', () => {
     return p
   }
 
-  test('caps the count to maxParticles', () => {
+  test('caps the count to max', () => {
     const t = sampleTargets(opaque(), 4, 4, 1, 1, 128, () => 0, 5)
     expect(t.count).toBe(5)
     expect(t.homeX.length).toBe(5)

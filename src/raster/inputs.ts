@@ -4,16 +4,16 @@ import type { AnimateItem } from '../types'
  * Everything that affects rasterization output. `useFieldTargets` re-runs the
  * rasterizer exactly when one of these changed — comparing ALL of them here
  * (pure, unit-tested) is the fix for silently ignoring runtime changes to
- * alpha/pointSpacingCss/maxParticles/defaultFontFamily.
+ * threshold/spacing/max/defaultFontFamily.
  */
 export interface RasterInputs {
   item: AnimateItem
   width: number
   height: number
   defaultFontFamily: string
-  alpha: number
-  pointSpacingCss: number
-  maxParticles: number
+  threshold: number
+  spacing: number
+  max: number
   /** Density cap applied to devicePixelRatio when rasterizing. */
   maxDpr: number
   /** Bumped by the component when devicePixelRatio changes (see Dotimation). */
@@ -35,9 +35,9 @@ export function sameRasterInputs(a: RasterInputs, b: RasterInputs): boolean {
     a.width === b.width &&
     a.height === b.height &&
     a.defaultFontFamily === b.defaultFontFamily &&
-    a.alpha === b.alpha &&
-    a.pointSpacingCss === b.pointSpacingCss &&
-    a.maxParticles === b.maxParticles &&
+    a.threshold === b.threshold &&
+    a.spacing === b.spacing &&
+    a.max === b.max &&
     a.maxDpr === b.maxDpr &&
     a.dprEpoch === b.dprEpoch &&
     a.fontEpoch === b.fontEpoch

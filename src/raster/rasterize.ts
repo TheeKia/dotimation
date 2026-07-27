@@ -32,9 +32,9 @@ export async function rasterize(
   height: number,
   item: AnimateItem,
   defaultFontFamily: string,
-  alpha: number,
-  pointSpacingCss: number,
-  maxParticles: number = Number.POSITIVE_INFINITY,
+  threshold: number,
+  spacingCss: number,
+  max: number = Number.POSITIVE_INFINITY,
   dpr: number = getDpr(),
 ): Promise<FieldTargets> {
   const empty = emptyFieldTargets()
@@ -59,9 +59,9 @@ export async function rasterize(
     devW,
     devH,
     dpr,
-    pointSpacingCss,
-    alpha,
+    spacingCss,
+    threshold,
     undefined,
-    maxParticles,
+    max,
   )
 }
