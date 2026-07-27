@@ -19,8 +19,8 @@ function Component() {
       item={{ type: 'text', data: 'Hello' }}
       width={256}
       height={256}
-      backend="auto"   // 'auto' | 'webgpu' | 'webgl2' | 'canvas2d'
-      idle="sleep"     // stop animating once particles settle
+      backend="auto"          // 'auto' | 'webgpu' | 'webgl2' | 'canvas2d'
+      motion={{ jitter: 0 }}  // calm/static once settled (see "Idle & performance")
     />
   )
 }
@@ -46,17 +46,64 @@ Or let the component track its parent's size:
 | `ariaLabel` | no | text content | Accessible name for the canvas (rendered with `role="img"`); supply one for image items |
 | `className` / `style` | no | — | Passed to the canvas (`style` excludes `width`/`height` — sizing is prop-driven) |
 | `defaultFontFamily` | no | `'sans-serif'` | Fallback font when `item.fontFamily` is not set |
-| `alpha` | no | `128` | Minimum pixel alpha (0–255) for a pixel to become a dot |
-| `pointSpacingCss` | no | `2` | Grid spacing (CSS px) between sampled dots — larger = fewer dots |
-| `dotSize` | no | `1` | Dot footprint in CSS px (a `dotSize`×`dotSize` square, scaled to device pixels — same visual size at every DPR) |
+| `dots` | no | — | Dot field appearance/sampling — see [Dot field](#dot-field) |
+| `motion` | no | — | Motion feel: shimmer, morph speed, damping, fade — see [Motion feel](#motion-feel) |
 | `backend` | no | `'auto'` | Rendering backend: `'auto' \| 'webgpu' \| 'webgl2' \| 'canvas2d'` |
-| `idle` | no | `'sleep'` | `'sleep'` stops the rAF loop once particles settle; `'animate'` keeps looping |
 | `matching` | no | `'swarm'` | Particle-to-dot assignment on content change: `'swarm'` is a chaotic cloud, `'nearest'` pairs each particle with a nearby destination for a calmer, directed morph |
-| `maxParticles` | no | — | Cap the total number of dots (uniform random subset); trades fidelity for performance |
 | `maxDpr` | no | `2` | Density cap for the canvas backing store; raise for full sharpness on 3× displays |
 | `reducedMotion` | no | OS setting | Force reduced-motion behavior on/off; omit to follow `prefers-reduced-motion` |
 | `onStats` | no | — | `(stats: { backend: 'webgpu' \| 'webgl2' \| 'canvas2d'; particles: number }) => void` — fires on engine creation and each field update; reveals which backend `'auto'` resolved to and the live particle count |
-| `canvasRef` | no | — | **Deprecated** — pass `ref` instead |
+
+### Dot field
+
+`dots` (type `DotOptions`, exported from the package root) controls sampling and appearance. Every field is optional; out-of-range input is sanitized silently — clamped to the nearest valid value (or the default, for non-finite input) rather than thrown.
+
+| Field | Default | Description |
+|-------|---------|--------------|
+| `size` | `1` | Dot footprint in CSS px (scales with devicePixelRatio — same visual size at every density). Non-positive or non-finite falls back to the default |
+| `spacing` | `2` | Sampling grid step in CSS px; larger = fewer, sparser dots. Floored at `1` |
+| `threshold` | `128` | Alpha cutoff (0–255) a source pixel must exceed to become a dot. Clamped to `[0, 255]` |
+| `max` | unbounded | Cap on total particles (uniform random subset after sampling); trades fidelity for performance |
+
+```tsx
+<Dotimation
+  item={{ type: 'text', data: 'Hello' }}
+  width={256}
+  height={256}
+  dots={{ size: 1.5, spacing: 3, threshold: 100 }}
+/>
+```
+
+### Motion feel
+
+`motion` (type `MotionOptions`, exported from the package root) controls the spring physics driving each morph and the idle shimmer. Every field is optional and sanitized silently.
+
+| Field | Default | Description |
+|-------|---------|--------------|
+| `jitter` | `1` | Shimmer amplitude in px per physics step; `0` disables it — particles go still once a morph settles. Clamped to `>= 0` |
+| `settleTime` | `0.85` | Seconds for a morph to converge. Floored at `0.2` (integrator stability) |
+| `damping` | `1` | Damping ratio: `1` = no overshoot, lower = bouncier. Clamped to `[0.3, 1]` |
+| `fade` | `2` | Opacity ease rate per second for fade-in/out |
+
+A few tuned starting points:
+
+```tsx
+// calm — gentle shimmer, slow, deliberate morphs
+<Dotimation item={item} width={256} height={256} motion={{ jitter: 0.3, settleTime: 1.2 }} />
+
+// snappy — default shimmer, fast morphs
+<Dotimation item={item} width={256} height={256} motion={{ settleTime: 0.35 }} />
+
+// bouncy — default shimmer/timing, springy overshoot
+<Dotimation item={item} width={256} height={256} motion={{ damping: 0.5 }} />
+```
+
+### Idle & performance
+
+There is no `idle` prop — the rAF loop's lifetime is derived from `motion.jitter`:
+
+- **`jitter > 0`** (the default): the shimmer never converges, so the loop keeps running for as long as the canvas is on-screen — gated by an `IntersectionObserver`, so a scrolled-away instance costs ~0%, and background tabs are throttled by the browser like any other `requestAnimationFrame` loop.
+- **`jitter === 0`** (or reduced motion, which forces it): the loop stops shortly after the field settles — ~0% idle CPU — and wakes again automatically on the next content, size, or motion change.
 
 ### Rendering backends
 
@@ -69,6 +116,20 @@ The canvas renders with `role="img"`. Text items get an accessible name from the
 ### Web fonts
 
 Text using a custom `fontFamily` that hasn't finished loading is rasterized with fallback metrics first, then automatically re-rasterized once the font arrives — no wiring needed.
+
+### Migrating from 0.6
+
+0.7 groups the flat tuning props into `dots` and `motion`, and removes `idle`/`canvasRef`:
+
+| 0.6 | 0.7 |
+| --- | --- |
+| `dotSize={1.5}` | `dots={{ size: 1.5 }}` |
+| `pointSpacingCss={2}` | `dots={{ spacing: 2 }}` |
+| `alpha={128}` | `dots={{ threshold: 128 }}` |
+| `maxParticles={20000}` | `dots={{ max: 20000 }}` |
+| `idle="sleep"` (freeze after settle) | `motion={{ jitter: 0 }}` (calm/static) |
+| `idle="animate"` | default behavior — remove the prop |
+| `canvasRef={ref}` | `ref={ref}` |
 
 ## Contributing
 
