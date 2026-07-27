@@ -1,4 +1,4 @@
-import { OPACITY_RATE } from '@/engine/constants'
+import { DEFAULT_MOTION } from '@/engine/params'
 import type { ParticleField } from '@/types'
 
 /**
@@ -16,11 +16,17 @@ export const STATE_STRIDE_BYTES: number = STATE_FLOATS * 4
 export const QUAD: Float32Array = new Float32Array([0, 0, 1, 0, 0, 1, 1, 1])
 
 /**
- * Faders fade out at OPACITY_RATE; after this long they are invisible and the
- * tail can be dropped. The Canvas2D backend compacts faders in stepField; the
- * GPU sims don't change count, so the backends expire them by elapsed time.
+ * Faders fade out at the live opacity rate; after this long they are invisible
+ * and the tail can be dropped. The Canvas2D backend compacts faders in
+ * stepField; the GPU sims don't change count, so the backends expire them by
+ * elapsed time, computed from the current rate.
  */
-export const FADE_DURATION_MS: number = (1 / OPACITY_RATE + 0.15) * 1000
+export function fadeDurationMs(opacityRate: number): number {
+  return (1 / opacityRate + 0.15) * 1000
+}
+
+/** TRANSITIONAL default-rate alias — removed in the backends task. */
+export const FADE_DURATION_MS: number = fadeDurationMs(DEFAULT_MOTION.fade)
 
 /** Writes interleaved state [x,y,vx,vy,r,g,b,alpha] for slots [start,end) into `out`; returns the used view. */
 export function packStateInto(
