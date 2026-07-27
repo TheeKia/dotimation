@@ -1,6 +1,6 @@
 import type { SimParams } from '@/engine/params'
 
-export type { DotOptions, MotionOptions } from '@/engine/params'
+export type { DotOptions, MotionOptions, SimParams } from '@/engine/params'
 
 export type AnimateItem =
   | {
@@ -70,7 +70,10 @@ export interface Backend {
    * e.g. snapField under prefers-reduced-motion.
    */
   uploadField(field: ParticleField, full?: boolean): void
-  /** Apply new sim params (dot size, jitter, spring, fade) live; read at step/draw time. */
+  /**
+   * Apply new sim params live; read at step/draw time. Carries dot size,
+   * jitter, spring k/c, settleTime, and the color/opacity ease rates.
+   */
   setParams(params: SimParams): void
   step(dt: number): void
   draw(): void
