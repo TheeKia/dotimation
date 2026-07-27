@@ -25,11 +25,35 @@ import { Dotimation } from '../src/index'
 //   - Biome (lint) is not type-aware and does not evaluate these either.
 //
 // So: nothing in CI currently gates the type-level assertions below. They
-// are accurate, deliberate documentation of the public prop surface, and
-// they WILL start being enforced automatically the moment `test/**` (or
-// this file) is added to a project that `tsc --noEmit` covers. Until then,
-// treat them as editor-checked documentation, not a CI gate — this only
-// matters for the props removed by the params-API redesign, guarded below.
+// are accurate, deliberate documentation of the public prop surface. Until
+// this file is folded into a type-checked project, treat them as
+// editor-checked documentation, not a CI gate.
+//
+// What's actually verified (not just asserted): each `@ts-expect-error`
+// below sits directly above the offending PROPERTY line inside its object
+// literal, not above the `const ...: Props = {` declaration — tsc reports
+// excess-property errors (TS2353) at the property, so a directive placed
+// above the declaration line instead suppresses nothing and additionally
+// fails as an "unused '@ts-expect-error' directive" (TS2578). Confirmed by
+// building a disposable probe project (`tsconfig.json` extended, `include`
+// widened to add this file, `types` widened to add `"bun"` so `bun:test`
+// resolves — the real tsconfig's `types: ["@webgpu/types"]` otherwise
+// blocks automatic `@types/bun` inclusion for ANY test file, a pre-existing,
+// unrelated gap) and running `bunx tsc --noEmit` against it:
+//   - With the directive above the `const` line (the bug this comment used
+//     to describe): every one of the 6 removed-prop guards produced BOTH a
+//     TS2578 (unused directive, at the const line) AND an unsuppressed
+//     TS2353 (excess property, at the property line) — i.e. the guard
+//     would fail open if a removed prop were ever reintroduced, while
+//     simultaneously erroring on its own directive.
+//   - With the directive moved to directly above the property (current
+//     state below): the probe reports zero diagnostics, exit code 0 — the
+//     6 guards suppress cleanly and the 2 valid fixtures (`validFixed`,
+//     `validFill`) type-check with no errors.
+// So: the guards below are now genuinely correct and WILL start being
+// enforced automatically (with the "bun" types caveat above) the moment
+// `test/**` is folded into a type-checked project — that just isn't this
+// repo's `bun run type-check` today.
 // -----------------------------------------------------------------------
 
 test('Dotimation is exported as a function component', () => {
@@ -75,51 +99,51 @@ const validFill: Props = {
 
 // Removed props (params-API redesign) must be rejected --------------------
 
-// @ts-expect-error dotSize was replaced by dots.size
 const removedDotSize: Props = {
   item: { type: 'text', data: 'x' },
   width: 10,
   height: 10,
+  // @ts-expect-error dotSize was replaced by dots.size
   dotSize: 4,
 }
 
-// @ts-expect-error pointSpacingCss was replaced by dots.spacing
 const removedPointSpacingCss: Props = {
   item: { type: 'text', data: 'x' },
   width: 10,
   height: 10,
+  // @ts-expect-error pointSpacingCss was replaced by dots.spacing
   pointSpacingCss: 4,
 }
 
-// @ts-expect-error alpha was replaced by dots.threshold
 const removedAlpha: Props = {
   item: { type: 'text', data: 'x' },
   width: 10,
   height: 10,
+  // @ts-expect-error alpha was replaced by dots.threshold
   alpha: 128,
 }
 
-// @ts-expect-error maxParticles was replaced by dots.max
 const removedMaxParticles: Props = {
   item: { type: 'text', data: 'x' },
   width: 10,
   height: 10,
+  // @ts-expect-error maxParticles was replaced by dots.max
   maxParticles: 1000,
 }
 
-// @ts-expect-error idle was removed; loop policy now derives from motion.jitter (and field content)
 const removedIdle: Props = {
   item: { type: 'text', data: 'x' },
   width: 10,
   height: 10,
+  // @ts-expect-error idle was removed; loop policy now derives from motion.jitter (and field content)
   idle: true,
 }
 
-// @ts-expect-error canvasRef was replaced by the React 19 `ref` prop
 const removedCanvasRef: Props = {
   item: { type: 'text', data: 'x' },
   width: 10,
   height: 10,
+  // @ts-expect-error canvasRef was replaced by the React 19 `ref` prop
   canvasRef: { current: null },
 }
 

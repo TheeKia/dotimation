@@ -36,9 +36,10 @@ export function createEngine(opts: EngineOptions): Engine {
     opts.params.opacityRate,
   )
   // `continuous` is what jitter alone asks for; the loop policy everywhere
-  // below reads `continuous && hasContent` — an empty field (no item.data,
-  // or fill mode before the first measure) has nothing to shimmer, so it
-  // must go through the ordinary settle/sleep path regardless of jitter.
+  // below reads `continuous && hasContent` — an empty ACTIVE layout (no
+  // item.data, or fill mode before the first measure) has nothing to
+  // shimmer, so it must go through the ordinary settle/sleep path
+  // regardless of jitter (see setField for why `active`, not `count`).
   let continuous = opts.params.jitter > 0
   let hasContent = false
   let rafId = 0
@@ -108,11 +109,18 @@ export function createEngine(opts: EngineOptions): Engine {
 
   return {
     setField(field, full): void {
-      // Track content BEFORE uploading/waking: an empty field (nothing to
-      // shimmer) must fall through to the settle/sleep path even when jitter
-      // > 0, and a field that just became non-empty must be eligible for the
-      // continuous path immediately (wake() below starts the loop if so).
-      hasContent = field.count > 0
+      // Track content BEFORE uploading/waking, and gate on `active` (the
+      // live layout), not `count`: `count` includes in-flight faders, so an
+      // empty layout that still has faders (e.g. content -> empty) would
+      // stay "stale-true" with count and never let the loop sleep once the
+      // fade completes. An empty ACTIVE layout means nothing to shimmer; any
+      // faders still ride the settle window below (wake() arms it, and
+      // settled() — src/engine/rest.ts — stays false while a fader's alpha
+      // is still above threshold, so the fade finishes on the sleep path
+      // before the loop stops itself). A field that just became non-empty
+      // must be eligible for the continuous path immediately (wake() below
+      // starts the loop if so).
+      hasContent = field.active > 0
       backend.uploadField(field, full)
       wake()
     },
