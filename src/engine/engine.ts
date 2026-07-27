@@ -1,24 +1,25 @@
-import type { Backend, IdleBehavior, ParticleField } from '@/types'
+import type { Backend, ParticleField } from '@/types'
 import { accumulate, FIXED_DT } from './clock'
-import { OPACITY_RATE, SETTLE_TIME } from './constants'
+import type { SimParams } from './params'
 import { computeSettleDuration } from './settle'
 
 export interface EngineOptions {
   backend: Backend
   canvas: HTMLCanvasElement
   dpr: number
-  idle: IdleBehavior
+  params: SimParams
 }
-
-const SETTLE_SECONDS = computeSettleDuration(SETTLE_TIME, OPACITY_RATE)
 
 export interface Engine {
   /** Push a reconciled field; `full` is forwarded to Backend.uploadField. */
   setField(field: ParticleField, full?: boolean): void
-  /** Update the dot footprint live (read at draw time) without recreating the engine. */
-  setDotSize(dotSize: number): void
-  /** Switch idle behavior live (read by the loop each frame) without recreating the engine. */
-  setIdle(next: IdleBehavior): void
+  /**
+   * Apply new sim params live (dot size, jitter, spring, fade) without
+   * recreating anything. Also re-derives the loop policy: jitter > 0 means
+   * the shimmer must stay visible, so the loop runs whenever on-screen;
+   * jitter === 0 means nothing moves once settled, so the loop sleeps.
+   */
+  setParams(params: SimParams): void
   /**
    * Resize in place without tearing down the engine — the component calls this
    * on width/height changes so simulation state survives across resizes.
@@ -29,7 +30,12 @@ export interface Engine {
 
 export function createEngine(opts: EngineOptions): Engine {
   const { backend, canvas } = opts
-  let idle = opts.idle
+  let params = opts.params
+  let settleSeconds = computeSettleDuration(
+    params.settleTime,
+    params.opacityRate,
+  )
+  let continuous = params.jitter > 0
   let rafId = 0
   let running = false
   let last = 0
@@ -45,10 +51,11 @@ export function createEngine(opts: EngineOptions): Engine {
     // Draw unconditionally while running: a skipped present is what made
     // cleared-buffer flicker possible on high-refresh displays, and skipping
     // was only ever worth it when preserveDrawingBuffer paid for it on every
-    // real present. The loop only runs during the awake window, so the extra
-    // draws are bounded and cheap.
+    // real present.
     backend.draw()
-    if (idle === 'sleep' && (now >= awakeUntil || backend.settled?.())) {
+    // With jitter active the field never converges (by design), so the
+    // settled() early-sleep only applies on the jitter === 0 path.
+    if (!continuous && (now >= awakeUntil || backend.settled?.())) {
       stop()
       return
     }
@@ -70,7 +77,7 @@ export function createEngine(opts: EngineOptions): Engine {
   }
 
   const wake = (): void => {
-    awakeUntil = performance.now() + SETTLE_SECONDS * 1000
+    awakeUntil = performance.now() + settleSeconds * 1000
     if (!running && visible) start()
   }
 
@@ -79,9 +86,9 @@ export function createEngine(opts: EngineOptions): Engine {
       ? new IntersectionObserver((entries) => {
           visible = entries[0]?.isIntersecting ?? true
           if (visible) {
-            // In 'animate' mode the loop must run whenever on-screen; in
-            // 'sleep' mode only resume if we're still inside the wake window.
-            if (idle === 'animate' || performance.now() < awakeUntil) start()
+            // Continuous (jitter > 0) must run whenever on-screen; otherwise
+            // only resume if still inside the wake window.
+            if (continuous || performance.now() < awakeUntil) start()
           } else {
             stop()
           }
@@ -94,18 +101,16 @@ export function createEngine(opts: EngineOptions): Engine {
       backend.uploadField(field, full)
       wake()
     },
-    setDotSize(dotSize): void {
-      backend.setDotSize(dotSize)
-      wake()
-    },
-    setIdle(next): void {
-      if (next === idle) return
-      idle = next
-      // 'animate' must run whenever visible; 'sleep' gets one settle window
-      // so an in-flight morph finishes before the loop stops itself.
-      if (idle === 'animate') {
+    setParams(next): void {
+      params = next
+      backend.setParams(next)
+      settleSeconds = computeSettleDuration(next.settleTime, next.opacityRate)
+      continuous = next.jitter > 0
+      if (continuous) {
         if (visible && !running) start()
       } else {
+        // One settle window so an in-flight morph (or a fresh dot size)
+        // paints before the loop stops itself.
         wake()
       }
     },

@@ -49,9 +49,6 @@ export function createCanvas2DBackend(initial: SimParams): Backend {
       field = next
       settledFlag = null
     },
-    setDotSize(next): void {
-      p = { ...p, dotSize: next }
-    },
     setParams(next): void {
       p = next
     },

@@ -178,9 +178,6 @@ export function createWebGL2Backend(initial: SimParams): Backend {
       count = plan.count
       lastUpload = performance.now()
     },
-    setDotSize(next: number): void {
-      p = { ...p, dotSize: next }
-    },
     setParams(next: SimParams): void {
       p = next
     },

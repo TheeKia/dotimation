@@ -182,10 +182,6 @@ export function createWebGPUBackend(initial: SimParams): Backend {
       count = plan.count
       lastUpload = performance.now()
     },
-    setDotSize(next: number): void {
-      p = { ...p, dotSize: next }
-      renderUniformDirty = true
-    },
     setParams(next: SimParams): void {
       p = next
       renderUniformDirty = true
