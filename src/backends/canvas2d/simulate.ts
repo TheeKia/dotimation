@@ -1,4 +1,3 @@
-import { COLOR_RATE, JITTER_AMOUNT, OPACITY_RATE } from '@/engine/constants'
 import { isSlotSettled } from '@/engine/rest'
 import type { ParticleField } from '@/types'
 import { createFastRand } from '../../utils/prng'
@@ -9,22 +8,29 @@ import { createFastRand } from '../../utils/prng'
 // injectable below so tests remain deterministic.
 const fastRand = createFastRand(Date.now())
 
+/** The subset of SimParams the CPU sim reads each step (SimParams satisfies it). */
+export interface StepParams {
+  k: number
+  c: number
+  jitter: number
+  opacityRate: number
+  colorRate: number
+}
+
 /**
  * Advances every slot one fixed step and compacts dead faders (targetAlpha 0
  * that have faded below epsilon) off the tail. Returns true when every slot
  * satisfies the same convergence predicate as isFieldSettled — evaluated
  * inline so the engine's per-frame settled() check is O(1) instead of a
  * second O(count) pass. `rand` is injectable for deterministic tests.
- * `jitterAmount` overrides the shimmer amplitude (0 under reduced motion).
  */
 export function stepField(
   field: ParticleField,
   dt: number,
-  k: number,
-  c: number,
+  p: StepParams,
   rand: () => number = fastRand,
-  jitterAmount: number = JITTER_AMOUNT,
 ): boolean {
+  const { k, c, jitter, opacityRate, colorRate } = p
   const {
     x,
     y,
@@ -45,8 +51,8 @@ export function stepField(
   // The color ease and alpha fade depend only on the (fixed) step `dt`, not on
   // any per-particle state, so they are identical for every particle this step.
   // Compute them once instead of re-evaluating Math.exp three times per particle.
-  const colorFactor = 1 - Math.exp(-COLOR_RATE * dt)
-  const delta = OPACITY_RATE * dt
+  const colorFactor = 1 - Math.exp(-colorRate * dt)
+  const delta = opacityRate * dt
 
   let settled = true
   for (let i = 0; i < field.count; i++) {
@@ -57,7 +63,7 @@ export function stepField(
     // Jitter is applied to X only — a deliberate horizontal shimmer carried
     // over from the original engine. Do not add Y jitter without intent: it
     // would change the established visual look.
-    x[i]! += vx[i]! * dt + (rand() - 0.5) * jitterAmount
+    x[i]! += vx[i]! * dt + (rand() - 0.5) * jitter
     y[i]! += vy[i]! * dt
     r[i] = r[i]! + (homeR[i]! - r[i]!) * colorFactor
     g[i] = g[i]! + (homeG[i]! - g[i]!) * colorFactor

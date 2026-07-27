@@ -1,3 +1,5 @@
+import type { SimParams } from '@/engine/params'
+
 export type AnimateItem =
   | {
       type: 'text'
@@ -71,6 +73,8 @@ export interface Backend {
   uploadField(field: ParticleField, full?: boolean): void
   /** Update the dot footprint (in CSS px). Read at draw time; no re-init needed. */
   setDotSize(dotSize: number): void
+  /** Apply new sim params (dot size, jitter, spring, fade) live; read at step/draw time. */
+  setParams(params: SimParams): void
   step(dt: number): void
   draw(): void
   /** Optional: true when the field has visibly converged, so the engine may sleep early. */

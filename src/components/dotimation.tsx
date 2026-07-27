@@ -1,9 +1,9 @@
 'use client'
 
 import { useEffect, useImperativeHandle, useRef, useState } from 'react'
-import { JITTER_AMOUNT } from '@/engine/constants'
 import { createEngine, type Engine } from '@/engine/engine'
 import { createField, reconcile, snapField } from '@/engine/field'
+import { resolveMotion, toSimParams } from '@/engine/params'
 import { selectBackend } from '@/engine/select'
 import { useFieldTargets } from '@/hooks/use-field-targets'
 import { useFontEpoch } from '@/hooks/use-font-epoch'
@@ -232,8 +232,7 @@ export default function Dotimation({
       try {
         selected = await selectBackend({
           requested: backend,
-          dotSize: constructedDotSize,
-          jitter: reduced ? 0 : JITTER_AMOUNT,
+          params: toSimParams(resolveMotion(), constructedDotSize, reduced),
           canvas,
           dpr,
         })

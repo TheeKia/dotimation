@@ -1,6 +1,5 @@
-import { SETTLE_TIME, ZETA } from '@/engine/constants'
+import type { SimParams } from '@/engine/params'
 import { isFieldSettled } from '@/engine/rest'
-import { tuneSpring } from '@/engine/settle'
 import type { Backend, ParticleField } from '@/types'
 import {
   computeDirtyRect,
@@ -10,13 +9,7 @@ import {
 } from './render'
 import { stepField } from './simulate'
 
-export interface Canvas2DOptions {
-  dotSize: number
-  /** Shimmer amplitude in px per step (0 disables, e.g. reduced motion). */
-  jitter: number
-}
-
-export function createCanvas2DBackend(opts: Canvas2DOptions): Backend {
+export function createCanvas2DBackend(initial: SimParams): Backend {
   let ctx: CanvasRenderingContext2D | null = null
   let imageData: ImageData | null = null
   let view: Uint32Array | null = null
@@ -24,13 +17,11 @@ export function createCanvas2DBackend(opts: Canvas2DOptions): Backend {
   let devH = 0
   let dpr = 1
   let field: ParticleField | null = null
-  let dotSize = opts.dotSize
-  const jitter = opts.jitter
+  let p = initial
   let prevDirty: DirtyRect | null = null
   // stepField's per-step convergence report; null = no step since the last
   // upload (fall back to the O(count) reference predicate once).
   let settledFlag: boolean | null = null
-  const { k, c } = tuneSpring({ settleTime: SETTLE_TIME, zeta: ZETA })
 
   function ensureBuffer(): void {
     if (!ctx) return
@@ -59,20 +50,23 @@ export function createCanvas2DBackend(opts: Canvas2DOptions): Backend {
       settledFlag = null
     },
     setDotSize(next): void {
-      dotSize = next
+      p = { ...p, dotSize: next }
+    },
+    setParams(next): void {
+      p = next
     },
     step(dt): void {
-      if (field) settledFlag = stepField(field, dt, k, c, undefined, jitter)
+      if (field) settledFlag = stepField(field, dt, p)
     },
     draw(): void {
       if (!ctx || !field) return
       ensureBuffer()
       if (!imageData || !view) return
-      const cur = computeDirtyRect(field, devW, devH, dpr, dotSize)
+      const cur = computeDirtyRect(field, devW, devH, dpr, p.dotSize)
       const clearR = unionRect(prevDirty, cur)
       prevDirty = cur
       if (!clearR) return
-      renderField(view, field, devW, devH, dpr, dotSize, clearR)
+      renderField(view, field, devW, devH, dpr, p.dotSize, clearR)
       ctx.putImageData(imageData, 0, 0, clearR.x, clearR.y, clearR.w, clearR.h)
     },
     settled(): boolean {
