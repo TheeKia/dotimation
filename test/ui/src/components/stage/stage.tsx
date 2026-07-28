@@ -60,7 +60,7 @@ export function Stage({
               width={width}
               height={height}
               dots={{
-                size: config.size,
+                size: config.hairline ? 'hairline' : config.size,
                 spacing: config.spacing,
                 threshold: config.threshold,
                 max: config.max,

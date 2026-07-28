@@ -115,6 +115,29 @@ describe('renderField', () => {
     renderField(view, f, 8, 8, 2, 1)
     expect(view.reduce((n, v) => n + (v !== 0 ? 1 : 0), 0)).toBe(4)
   })
+
+  test('hairline sentinel: dotSize 0 floors to exactly 1 pixel at dpr 1', () => {
+    const f = reconcile(createField(1), one(2, 3))
+    f.x[0] = 2
+    f.y[0] = 3
+    f.alpha[0] = 1
+    const view = new Uint32Array(8 * 8)
+    renderField(view, f, 8, 8, 1, 0)
+    expect(view[3 * 8 + 2]).not.toBe(0)
+    expect(view.reduce((n, v) => n + (v !== 0 ? 1 : 0), 0)).toBe(1)
+  })
+
+  test('hairline sentinel: dotSize 0 still paints exactly 1 device pixel at dpr 2', () => {
+    const f = reconcile(createField(1), one(1, 1))
+    f.x[0] = 1
+    f.y[0] = 1
+    f.alpha[0] = 1
+    const view = new Uint32Array(8 * 8)
+    renderField(view, f, 8, 8, 2, 0)
+    // CSS (1,1) snaps to device (2,2); footprint max(1, round(0 * 2)) = 1.
+    expect(view[2 * 8 + 2]).not.toBe(0)
+    expect(view.reduce((n, v) => n + (v !== 0 ? 1 : 0), 0)).toBe(1)
+  })
 })
 
 describe('computeDirtyRect', () => {
@@ -146,6 +169,22 @@ describe('computeDirtyRect', () => {
     f.y[0] = 7
     f.alpha[0] = 1
     expect(computeDirtyRect(f, 8, 8, 1, 4)).toEqual({ x: 7, y: 7, w: 1, h: 1 })
+  })
+
+  test('hairline sentinel: dotSize 0 yields a 1x1 dirty rect', () => {
+    const f = reconcile(createField(1), one(2, 3))
+    f.x[0] = 2
+    f.y[0] = 3
+    f.alpha[0] = 1
+    expect(computeDirtyRect(f, 8, 8, 1, 0)).toEqual({ x: 2, y: 3, w: 1, h: 1 })
+  })
+
+  test('hairline sentinel: dotSize 0 yields a 1x1 dirty rect at dpr 2', () => {
+    const f = reconcile(createField(1), one(1, 1))
+    f.x[0] = 1
+    f.y[0] = 1
+    f.alpha[0] = 1
+    expect(computeDirtyRect(f, 8, 8, 2, 0)).toEqual({ x: 2, y: 2, w: 1, h: 1 })
   })
 })
 

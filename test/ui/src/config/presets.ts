@@ -50,6 +50,7 @@ export const DEFAULT_CONFIG: PlaygroundConfig = {
   slots: { A: TEXT_DEFAULT, B: IMAGE_DEFAULT },
   active: 'A',
   size: 1,
+  hairline: false,
   spacing: 2,
   threshold: 128,
   max: undefined,

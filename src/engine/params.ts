@@ -2,8 +2,11 @@ import { tuneSpring } from './settle'
 
 /** User-facing dot field options (the `dots` prop). All optional. */
 export interface DotOptions {
-  /** Dot footprint in CSS px (scales with devicePixelRatio). @default 1 */
-  size?: number
+  /**
+   * Dot footprint in CSS px (scales with devicePixelRatio), or `'hairline'`
+   * for exactly 1 device pixel at any DPR. @default 1
+   */
+  size?: number | 'hairline'
   /** Sampling grid step in CSS px; larger = sparser dots. Min 1. @default 2 */
   spacing?: number
   /** Alpha cutoff (0-255) a source pixel must exceed to become a dot. @default 128 */
@@ -84,9 +87,21 @@ function num(v: number | undefined, fallback: number): number {
   return typeof v === 'number' && Number.isFinite(v) ? v : fallback
 }
 
+/**
+ * 'hairline' resolves to the internal 0 sentinel: every tier derives its dot
+ * footprint as max(1, round(dotSize * dpr)) (the cross-tier parity contract —
+ * see CLAUDE.md), so 0 floors to exactly one device pixel at any DPR and any
+ * maxDpr. Numeric size <= 0 still falls back to the default, which keeps the
+ * sentinel unreachable except through the explicit string.
+ */
+function resolveSize(raw: number | 'hairline' | undefined): number {
+  if (raw === 'hairline') return 0
+  const n = num(raw, DEFAULT_DOTS.size)
+  return n > 0 ? n : DEFAULT_DOTS.size
+}
+
 /** Fills defaults and sanitizes out-of-range input (silently — degrade, never throw). */
 export function resolveDots(input?: DotOptions): ResolvedDots {
-  const size = num(input?.size, DEFAULT_DOTS.size)
   const spacing = num(input?.spacing, DEFAULT_DOTS.spacing)
   const threshold = num(input?.threshold, DEFAULT_DOTS.threshold)
   // Infinity is the valid "unbounded" value for max, so only NaN falls back.
@@ -96,7 +111,7 @@ export function resolveDots(input?: DotOptions): ResolvedDots {
       ? Math.max(0, Math.floor(rawMax))
       : DEFAULT_DOTS.max
   return {
-    size: size > 0 ? size : DEFAULT_DOTS.size,
+    size: resolveSize(input?.size),
     spacing: Math.max(1, spacing),
     threshold: Math.min(255, Math.max(0, threshold)),
     max,

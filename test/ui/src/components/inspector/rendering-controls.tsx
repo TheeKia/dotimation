@@ -2,6 +2,7 @@ import type { ConfigApi } from '../../config/use-config'
 import { Field } from '../controls/field'
 import { Select } from '../controls/select'
 import { Slider } from '../controls/slider'
+import { Toggle } from '../controls/toggle'
 
 const FONT_FAMILIES = [
   { label: 'sans-serif', value: 'sans-serif' },
@@ -24,6 +25,12 @@ export function RenderingControls({
           min={1}
           max={6}
           onChange={(v) => update({ size: v })}
+        />
+      </Field>
+      <Field label="hairline">
+        <Toggle
+          checked={config.hairline}
+          onChange={(v) => update({ hairline: v })}
         />
       </Field>
       <Field label="spacing">

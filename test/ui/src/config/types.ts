@@ -31,6 +31,7 @@ export type PlaygroundConfig = {
   slots: Record<SlotId, ItemConfig>
   active: SlotId
   size: number
+  hairline: boolean
   spacing: number
   threshold: number
   max: number | undefined
