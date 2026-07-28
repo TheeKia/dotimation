@@ -1,6 +1,6 @@
 {
   "name": "dotimation",
-  "version": "0.7.0",
+  "version": "0.7.1",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/TheeKia/dotimation.git"
@@ -51,6 +51,7 @@
     "build:worker": "bun scripts/build-worker.ts",
     "dev": "bun scripts/build-worker.ts && bun run --cwd test/ui dev",
     "prepare": "bun simple-git-hooks && bun scripts/build-worker.ts",
+    "prepublishOnly": "bun run build && bun scripts/check-dist.ts",
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
     "test": "bun test",
