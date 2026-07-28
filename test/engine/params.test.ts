@@ -57,6 +57,20 @@ describe('resolveDots', () => {
     )
     expect(resolveDots({ max: Number.NaN }).max).toBe(DEFAULT_DOTS.max)
   })
+
+  test("size: 'hairline' resolves to the internal 0 sentinel", () => {
+    const r = resolveDots({ size: 'hairline' })
+    expect(r.size).toBe(0)
+    expect(r.spacing).toBe(DEFAULT_DOTS.spacing)
+    expect(r.threshold).toBe(DEFAULT_DOTS.threshold)
+    expect(r.max).toBe(DEFAULT_DOTS.max)
+  })
+
+  test('junk string sizes (JS consumers) fall back to the default', () => {
+    expect(resolveDots({ size: 'chunky' as unknown as number }).size).toBe(
+      DEFAULT_DOTS.size,
+    )
+  })
 })
 
 describe('resolveMotion', () => {
@@ -129,5 +143,14 @@ describe('toSimParams', () => {
     expect(p.jitter).toBe(1)
     expect(p.opacityRate).toBe(2)
     expect(p.colorRate).toBe(2)
+  })
+
+  test('carries the hairline 0 sentinel through to dotSize', () => {
+    const p = toSimParams(
+      resolveMotion(),
+      resolveDots({ size: 'hairline' }).size,
+      false,
+    )
+    expect(p.dotSize).toBe(0)
   })
 })
