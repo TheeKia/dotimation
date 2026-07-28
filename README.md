@@ -60,7 +60,7 @@ Or let the component track its parent's size:
 
 | Field | Default | Description |
 |-------|---------|--------------|
-| `size` | `1` | Dot footprint in CSS px (scales with devicePixelRatio — same visual size at every density). Non-positive or non-finite falls back to the default |
+| `size` | `1` | Dot footprint in CSS px (scales with devicePixelRatio — same visual size at every density), or `'hairline'` for exactly 1 device pixel at any DPR (the crispest possible dots). Non-positive or non-finite numbers fall back to the default |
 | `spacing` | `2` | Sampling grid step in CSS px; larger = fewer, sparser dots. Floored at `1` |
 | `threshold` | `128` | Alpha cutoff (0–255) a source pixel must exceed to become a dot. Clamped to `[0, 255]` |
 | `max` | unbounded | Cap on total particles (uniform random subset after sampling); trades fidelity for performance |
