@@ -16,6 +16,7 @@ fn vs(
   @location(3) instAlpha: f32,
 ) -> VOut {
   // CSS-px dot size -> device-px footprint, rounded like the other tiers.
+  // The max(1, …) floor is load-bearing: dots.size 'hairline' resolves to dotSize 0 and relies on it.
   let sizeDev = max(1.0, floor(R.dotSize * R.dpr + 0.5));
   let dev = floor(instPos * R.dpr + vec2<f32>(0.5, 0.5)) + corner * sizeDev;
   let clip = vec2<f32>(dev.x / R.devW * 2.0 - 1.0, 1.0 - dev.y / R.devH * 2.0);

@@ -17,6 +17,7 @@ out float vAlpha;
 void main() {
   // CSS-px dot size -> device-px footprint, rounded like the Canvas2D tier
   // (max(1, round(dotSize * dpr))) so all tiers render identical dots.
+  // The max(1, …) floor is load-bearing: dots.size 'hairline' resolves to dotSize 0 and relies on it.
   float sizeDev = max(1.0, floor(uDotSize * uDpr + 0.5));
   // device-px position of this corner of the dot
   vec2 dev = floor(aInstancePos * uDpr + 0.5) + aCorner * sizeDev;

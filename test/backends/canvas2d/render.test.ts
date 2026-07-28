@@ -178,6 +178,14 @@ describe('computeDirtyRect', () => {
     f.alpha[0] = 1
     expect(computeDirtyRect(f, 8, 8, 1, 0)).toEqual({ x: 2, y: 3, w: 1, h: 1 })
   })
+
+  test('hairline sentinel: dotSize 0 yields a 1x1 dirty rect at dpr 2', () => {
+    const f = reconcile(createField(1), one(1, 1))
+    f.x[0] = 1
+    f.y[0] = 1
+    f.alpha[0] = 1
+    expect(computeDirtyRect(f, 8, 8, 2, 0)).toEqual({ x: 2, y: 2, w: 1, h: 1 })
+  })
 })
 
 describe('unionRect', () => {
