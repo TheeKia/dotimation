@@ -1,5 +1,9 @@
 # dotimation
 
+[![npm](https://img.shields.io/npm/v/dotimation)](https://www.npmjs.com/package/dotimation)
+[![CI](https://github.com/TheeKia/dotimation/actions/workflows/ci.yml/badge.svg)](https://github.com/TheeKia/dotimation/actions/workflows/ci.yml)
+[![license](https://img.shields.io/npm/l/dotimation)](./LICENSE)
+
 Animate anything with dots
 
 ## Installation
