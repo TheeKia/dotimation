@@ -66,11 +66,11 @@
     },
     "packages/core": {
       "name": "@kiaa/dotimation-core",
-      "version": "0.8.0",
+      "version": "0.8.1",
     },
     "packages/react": {
       "name": "@kiaa/dotimation-react",
-      "version": "0.8.0",
+      "version": "0.8.1",
       "dependencies": {
         "@kiaa/dotimation-core": "workspace:*",
       },
@@ -85,7 +85,7 @@
     },
     "packages/svelte": {
       "name": "@kiaa/dotimation-svelte",
-      "version": "0.8.0",
+      "version": "0.8.1",
       "dependencies": {
         "@kiaa/dotimation-core": "workspace:*",
       },
