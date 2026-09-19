@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   release:
-    name: Release Package
+    name: Release Packages
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -39,14 +39,45 @@ jobs:
       - name: Build
         run: bun run build
 
+      - name: Validate package output and release tag
+        run: |
+          bun run check:dist
+          bun scripts/check-release.ts
+
+      - name: Install Playwright Chromium
+        run: bunx playwright install --with-deps chromium
+
+      - name: Verify both adapters in Chromium
+        run: bun run test:e2e
+
+      - name: Verify packed consumers
+        run: bun run test:packages
+
+      # Core must be available before either adapter can be installed. The
+      # republish flag lets a retry finish a partially published release.
+      - name: Publish core
+        working-directory: packages/core
+        run: bun publish --access public --tolerate-republish
+        env:
+          NPM_CONFIG_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_CONFIG_PROVENANCE: true
+
+      - name: Publish React adapter
+        working-directory: packages/react
+        run: bun publish --access public --tolerate-republish
+        env:
+          NPM_CONFIG_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_CONFIG_PROVENANCE: true
+
+      - name: Publish Svelte adapter
+        working-directory: packages/svelte
+        run: bun publish --access public --tolerate-republish
+        env:
+          NPM_CONFIG_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_CONFIG_PROVENANCE: true
+
       - name: Generate changelog
         run: bunx changelogithub
         continue-on-error: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Publish to npm
-        run: bun publish --access public --no-git-checks
-        env:
-          NPM_CONFIG_TOKEN: ${{ secrets.NPM_TOKEN }}
-          NPM_CONFIG_PROVENANCE: true

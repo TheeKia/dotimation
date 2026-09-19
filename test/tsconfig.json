@@ -4,6 +4,14 @@
     "types": ["bun", "@webgpu/types"],
     "isolatedDeclarations": false
   },
-  "include": ["../src/**/*", "./**/*.test.ts"],
-  "exclude": ["../node_modules", "./ui"]
+  "include": [
+    "../packages/core/**/*.ts",
+    "../packages/react/**/*.ts",
+    "../packages/react/**/*.tsx",
+    "../scripts/**/*.ts",
+    "./e2e/**/*.ts",
+    "./fixtures/browser/**/*.ts",
+    "./*.test.ts"
+  ],
+  "exclude": ["../packages/*/dist", "../node_modules"]
 }

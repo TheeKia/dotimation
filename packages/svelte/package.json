@@ -1,0 +1,41 @@
+{
+  "name": "@dotimation/svelte",
+  "version": "0.7.3",
+  "type": "module",
+  "license": "MIT",
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "svelte": "./dist/index.js"
+    }
+  },
+  "dependencies": {
+    "@dotimation/core": "workspace:*"
+  },
+  "peerDependencies": {
+    "svelte": "^5.29.0"
+  },
+  "devDependencies": {
+    "@sveltejs/package": "^2.5.0",
+    "svelte": "^5.29.0",
+    "svelte-check": "^4.0.0"
+  },
+  "scripts": {
+    "build": "svelte-package",
+    "type-check": "svelte-check --tsconfig ./tsconfig.json --fail-on-warnings",
+    "prepublishOnly": "bun run --cwd ../.. build && bun run --cwd ../.. check:dist"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/TheeKia/dotimation.git",
+    "directory": "packages/svelte"
+  },
+  "homepage": "https://github.com/TheeKia/dotimation#readme",
+  "bugs": {
+    "url": "https://github.com/TheeKia/dotimation/issues"
+  },
+  "description": "Animate anything with dots \u2014 Svelte component"
+}

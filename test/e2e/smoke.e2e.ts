@@ -10,7 +10,8 @@
 import type { Page } from 'playwright'
 import { chromium } from 'playwright'
 
-const PORT = 5273
+const framework = process.env.DOTIMATION_E2E_FRAMEWORK ?? 'react'
+const PORT = framework === 'svelte' ? 5274 : 5273
 const URL = `http://localhost:${PORT}`
 const failures: string[] = []
 
@@ -90,7 +91,7 @@ async function selectBackend2d(page: Page): Promise<void> {
  * Sets a native input's value and dispatches a real `input` event, so React's
  * onChange fires exactly as it would from a user drag — used to drive the
  * jitter slider (identified by its e2e-only aria-label, see
- * `test/ui/src/components/controls/slider.tsx`) without simulating a mouse
+ * `apps/playground-react/src/components/controls/slider.tsx`) without simulating a mouse
  * drag across an analog range control.
  */
 async function setSliderValue(
@@ -195,7 +196,7 @@ async function runReducedMotion(page: Page, errors: string[]): Promise<void> {
  * old ~1.5s settle-and-sleep window no longer applies once jitter is nonzero.
  * `?jitter=1` (the default anyway) pins the value explicitly so this scenario
  * is deterministic regardless of what a prior scenario left in localStorage
- * (see `applyQueryOverrides` in `test/ui/src/config/use-config.ts`). Also
+ * (see `applyQueryOverrides` in `apps/playground-react/src/config/use-config.ts`). Also
  * clears the `prefers-reduced-motion: reduce` emulation the previous scenario
  * left on the page — reduced motion forces jitter to 0 regardless of the
  * `motion` prop (see `toSimParams`), which would otherwise make this scenario
@@ -308,7 +309,7 @@ async function runLifecycle(page: Page, errors: string[]): Promise<void> {
   )
   await page.waitForTimeout(1000)
   check(
-    'fill starts at parent size and paints in StrictMode',
+    'fill starts at parent size and paints',
     (await paintedPixels(page)) > 100,
   )
   check(
@@ -419,7 +420,8 @@ async function runAsyncStartup(page: Page, errors: string[]): Promise<void> {
         .locator('canvas')
         .evaluate(
           (canvas) =>
-            canvas.dataset.backendSize === `${canvas.width}:${canvas.height}`,
+            canvas.dataset.backendSize ===
+            `${(canvas as HTMLCanvasElement).width}:${(canvas as HTMLCanvasElement).height}`,
         ),
     )
     await page.waitForTimeout(1000)
@@ -482,6 +484,134 @@ async function runRasterRetry(page: Page, errors: string[]): Promise<void> {
   )
 }
 
+async function runAdapterContract(page: Page, errors: string[]): Promise<void> {
+  await page.goto(`${URL}/lifecycle.html`)
+  await page.waitForFunction(
+    () => (window.lifecycle?.stats?.particles ?? 0) > 0,
+  )
+  check(
+    'framework canvas reference points at the rendered element',
+    await page.evaluate(
+      () => window.lifecycle.element === document.querySelector('canvas'),
+    ),
+  )
+  const original = await page.locator('canvas').elementHandle()
+  await page.evaluate(() =>
+    window.lifecycle.render({
+      motion: { jitter: 1 },
+      dots: { size: 2 },
+      item: { type: 'text', data: 'Updated' },
+    }),
+  )
+  await page.waitForFunction(
+    () =>
+      document.querySelector('canvas')?.getAttribute('aria-label') ===
+      'Updated',
+  )
+  await page.waitForTimeout(500)
+  check(
+    'content and motion updates preserve canvas identity',
+    await original!.evaluate(
+      (element) => element === document.querySelector('canvas'),
+    ),
+  )
+  check('live prop changes still paint', (await paintedPixels(page)) > 100)
+  const previousUpdates = await page.evaluate(() => window.lifecycle.updates)
+  await page.evaluate(() => window.lifecycle.mutateContent('Mutated'))
+  await page.waitForFunction(
+    (previous) => window.lifecycle.updates > previous,
+    previousUpdates,
+  )
+  await page.waitForFunction(
+    () =>
+      document.querySelector('canvas')?.getAttribute('aria-label') ===
+      'Mutated',
+  )
+  await page.waitForTimeout(100)
+  check(
+    'in-place content mutation is observed on adapter update',
+    (await paintedPixels(page)) > 100,
+  )
+  const cdp = await page.context().newCDPSession(page)
+  // Chromium needs a viewport change to deliver media-query change events
+  // under CDP device-scale emulation. A DPR-only override updates the value
+  // without notifying the existing resolution query.
+  await cdp.send('Emulation.setDeviceMetricsOverride', {
+    width: 1281,
+    height: 800,
+    deviceScaleFactor: 2,
+    mobile: false,
+  })
+  await page.waitForFunction(
+    () =>
+      devicePixelRatio === 2 && document.querySelector('canvas')?.width === 640,
+  )
+  check(
+    'DPR changes replace the canvas and update the native reference',
+    !(await original!.evaluate((element) => element.isConnected)) &&
+      (await page.evaluate(
+        () => window.lifecycle.element === document.querySelector('canvas'),
+      )),
+  )
+  const denseCanvas = await page.locator('canvas').elementHandle()
+  await page.evaluate(() => window.lifecycle.render({ maxDpr: 1 }))
+  await page.waitForFunction(
+    () =>
+      window.lifecycle.element === document.querySelector('canvas') &&
+      (window.lifecycle.stats?.particles ?? 0) > 0,
+  )
+  check(
+    'density change supplies a fresh canvas and updates the framework reference',
+    !(await denseCanvas!.evaluate((element) => element.isConnected)),
+  )
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  await page.waitForTimeout(500)
+  const still = await pixelHash(page)
+  await page.waitForTimeout(250)
+  check(
+    'system reduced motion makes positive-jitter content still',
+    still === (await pixelHash(page)) && (await paintedPixels(page)) > 100,
+  )
+  await page.evaluate(() =>
+    window.lifecycle.render({ item: { type: 'text', data: '' } }),
+  )
+  await page.waitForFunction(() => window.lifecycle.stats?.particles === 0)
+  await page.waitForTimeout(100)
+  check('empty content clears the canvas', (await paintedPixels(page)) === 0)
+  await page.evaluate(() =>
+    window.lifecycle.render({
+      fill: false,
+      width: 240,
+      height: 80,
+      item: { type: 'text', data: 'Restored' },
+    }),
+  )
+  await page.waitForFunction(
+    () =>
+      document.querySelector('canvas')?.width === 240 &&
+      (window.lifecycle.stats?.particles ?? 0) > 0,
+  )
+  await page.waitForTimeout(100)
+  check(
+    'fill can switch to fixed dimensions without blank output',
+    (await paintedPixels(page)) > 100,
+  )
+  await page.evaluate(() => window.lifecycle.unmount())
+  await page.waitForFunction(() => !document.querySelector('canvas'))
+  check(
+    'unmount clears the framework element reference',
+    await page.evaluate(() => !window.lifecycle.element),
+  )
+  await cdp.send('Emulation.clearDeviceMetricsOverride')
+  await cdp.detach()
+  await page.emulateMedia({ reducedMotion: 'no-preference' })
+  check(
+    'adapter contract produces no console errors',
+    errors.length === 0,
+    errors.join(' | '),
+  )
+}
+
 async function runGpuParity(page: Page, errors: string[]): Promise<void> {
   await page.goto(`${URL}/lifecycle.html`)
   await page.waitForFunction(() => !!window.lifecycle?.stats)
@@ -512,9 +642,201 @@ async function runGpuParity(page: Page, errors: string[]): Promise<void> {
   )
 }
 
+async function runSveltePlayground(
+  page: Page,
+  errors: string[],
+): Promise<void> {
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  await page.goto(URL)
+  await page.getByText('Rendering', { exact: true }).click()
+  await page.getByLabel('Backend', { exact: true }).selectOption('canvas2d')
+  await page.waitForFunction(
+    () =>
+      Number(document.querySelector('[data-testid="particles"]')?.textContent) >
+      0,
+  )
+  await page.waitForTimeout(400)
+  check(
+    'Svelte defaults to system motion preference',
+    (await page.getByLabel('Motion preference').inputValue()) === 'auto',
+  )
+  const still = await pixelHash(page)
+  await page.waitForTimeout(300)
+  check(
+    'Svelte playground honors OS reduced motion',
+    still === (await pixelHash(page)) && (await paintedPixels(page)) > 0,
+  )
+
+  const original = await page.locator('canvas').elementHandle()
+  await page.getByLabel('Text', { exact: true }).fill('Verified Svelte')
+  await page.waitForFunction(
+    () =>
+      document.querySelector('canvas')?.getAttribute('aria-label') ===
+      'Verified Svelte',
+  )
+  await page.getByLabel('Spacing', { exact: true }).fill('4')
+  await page.getByLabel('Matching').selectOption('nearest')
+  check(
+    'Svelte live controls retain the canvas',
+    (await original?.evaluate(
+      (canvas) => canvas === document.querySelector('canvas'),
+    )) === true,
+  )
+  await page.getByLabel('Max particles', { exact: true }).fill('0')
+  await page.waitForFunction(
+    () =>
+      document.querySelector('[data-testid="particles"]')?.textContent === '0',
+  )
+  check(
+    'Svelte zero particle limit clears the layout',
+    (await paintedPixels(page)) === 0,
+  )
+  await page.getByLabel('Max particles', { exact: true }).fill('')
+  await page.waitForFunction(
+    () =>
+      Number(document.querySelector('[data-testid="particles"]')?.textContent) >
+      0,
+  )
+  await page.getByRole('button', { name: 'Slot B', exact: true }).click()
+  await page.getByLabel('Choose an image').setInputFiles({
+    name: 'test.svg',
+    mimeType: 'image/svg+xml',
+    buffer: Buffer.from(
+      '<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80"><rect width="80" height="80" fill="red"/></svg>',
+    ),
+  })
+  await page.waitForFunction(() =>
+    (
+      document.querySelector(
+        'input[placeholder="https://… or a data URL"]',
+      ) as HTMLInputElement
+    )?.value.startsWith('data:image/svg+xml;base64,'),
+  )
+  await page.waitForFunction(() => {
+    const canvas = document.querySelector('canvas')!
+    const data = canvas
+      .getContext('2d')!
+      .getImageData(0, 0, canvas.width, canvas.height).data
+    for (let i = 0; i < data.length; i += 4) {
+      if (data[i]! > 200 && data[i + 1]! < 30 && data[i + 3]! > 200) return true
+    }
+    return false
+  })
+  check(
+    'Svelte image upload renders the uploaded red pixels',
+    (await paintedPixels(page)) > 0,
+  )
+  await page.getByRole('button', { name: 'Slot A', exact: true }).click()
+  check(
+    'A/B compositions preserve independent content',
+    (await page.getByLabel('Text', { exact: true }).inputValue()) ===
+      'Verified Svelte',
+  )
+  await page.getByLabel('Text', { exact: true }).press('Space')
+  check(
+    'Space inside text does not switch slots',
+    (await page
+      .getByRole('button', { name: 'Slot A', exact: true })
+      .getAttribute('aria-pressed')) === 'true',
+  )
+  await page.locator('h1').click()
+  await page.keyboard.press('Space')
+  check(
+    'Space outside controls morphs to the other slot',
+    (await page
+      .getByRole('button', { name: 'Slot B', exact: true })
+      .getAttribute('aria-pressed')) === 'true',
+  )
+
+  await page.getByLabel('Canvas sizing').selectOption('fixed')
+  await page.getByLabel('Width', { exact: true }).fill('320')
+  await page.getByLabel('Height', { exact: true }).fill('240')
+  await page.waitForFunction(
+    () =>
+      document.querySelector('canvas')?.getBoundingClientRect().width === 320,
+  )
+  check(
+    'Svelte fixed size controls set the CSS box',
+    (await page.locator('canvas').boundingBox())?.height === 240,
+  )
+  await page.getByText('Svelte code', { exact: true }).click()
+  check(
+    'Svelte code export uses the Svelte package and current dimensions',
+    (await page.locator('pre').textContent())?.includes('"width": 320') ===
+      true,
+  )
+  await page.waitForTimeout(400)
+  await page.reload()
+  check(
+    'Svelte settings survive reload',
+    (await page.getByLabel('Canvas sizing').inputValue()) === 'fixed' &&
+      (await page.getByLabel('Width', { exact: true }).inputValue()) === '320',
+  )
+  await page.getByRole('button', { name: 'Reset all' }).click()
+  check(
+    'Svelte reset restores system motion and text',
+    (await page.getByLabel('Motion preference').inputValue()) === 'auto' &&
+      (await page.getByLabel('Text', { exact: true }).inputValue()) ===
+        'Hello\nSvelte',
+  )
+  // Probe pixel bytes on Canvas2D. A presented, sleeping GPU canvas can
+  // remain visible in the compositor while drawImage reads a cleared buffer.
+  await page.getByText('Rendering', { exact: true }).click()
+  await page.getByLabel('Backend', { exact: true }).selectOption('canvas2d')
+  await page.waitForFunction(
+    () =>
+      document.querySelector('[data-testid="backend"]')?.textContent ===
+        'canvas2d' &&
+      Number(document.querySelector('[data-testid="particles"]')?.textContent) >
+        0,
+  )
+  await page.evaluate(() => window.scrollTo(0, 0))
+  await page.setViewportSize({ width: 390, height: 844 })
+  check(
+    'Svelte playground fits a mobile viewport',
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+  )
+  await page.waitForTimeout(700)
+  check(
+    'Svelte mobile canvas paints after resize',
+    (await paintedPixels(page)) > 0,
+  )
+  await page.screenshot({
+    path: '/tmp/dotimation-svelte-mobile.png',
+    fullPage: true,
+  })
+  await page.setViewportSize({ width: 1280, height: 800 })
+  await page.waitForTimeout(700)
+  check(
+    'Svelte desktop canvas paints after resize',
+    (await paintedPixels(page)) > 0,
+  )
+  await page.screenshot({
+    path: '/tmp/dotimation-svelte-desktop.png',
+    fullPage: true,
+  })
+  await page.evaluate(() =>
+    localStorage.setItem('dotimation-svelte-playground:v1', '{broken'),
+  )
+  await page.reload()
+  check(
+    'Svelte recovers from malformed saved settings',
+    (await page.getByLabel('Text', { exact: true }).inputValue()) ===
+      'Hello\nSvelte',
+  )
+  check(
+    'no console errors in Svelte playground',
+    errors.length === 0,
+    errors.join(' | '),
+  )
+  await page.emulateMedia({ reducedMotion: 'no-preference' })
+}
+
 const vite = Bun.spawn(
   ['bunx', '--bun', 'vite', '--port', String(PORT), '--strictPort'],
-  { cwd: 'test/ui', stdout: 'ignore', stderr: 'pipe' },
+  { cwd: `apps/playground-${framework}`, stdout: 'ignore', stderr: 'inherit' },
 )
 
 try {
@@ -540,25 +862,36 @@ try {
     })
     page.on('pageerror', (err) => errors.push(String(err)))
 
-    if (process.env.DOTIMATION_E2E_GPU_ONLY === '1') {
+    if (process.env.DOTIMATION_E2E_ADAPTER_ONLY === '1') {
+      await runAdapterContract(page, errors)
+    } else if (process.env.DOTIMATION_E2E_GPU_ONLY === '1') {
       await runGpuParity(page, errors)
     } else {
-      console.log('scenario: default')
-      await run(page, errors)
-      errors.length = 0
-      console.log('scenario: prefers-reduced-motion')
-      await runReducedMotion(page, errors)
-      errors.length = 0
-      console.log('scenario: shimmer persists (jitter > 0 never sleeps)')
-      await runShimmerPersists(page, errors)
-      errors.length = 0
-      console.log('scenario: jitter 0 sleeps after settling')
-      await runJitterZeroSleeps(page, errors)
-      errors.length = 0
-      console.log('scenario: live motion change is seamless')
-      await runLiveMotionChange(page, errors)
-      errors.length = 0
-      console.log('scenario: fill, zero size, StrictMode and failed GPU init')
+      if (framework === 'react') {
+        console.log('scenario: default')
+        await run(page, errors)
+        errors.length = 0
+        console.log('scenario: prefers-reduced-motion')
+        await runReducedMotion(page, errors)
+        errors.length = 0
+        console.log('scenario: shimmer persists (jitter > 0 never sleeps)')
+        await runShimmerPersists(page, errors)
+        errors.length = 0
+        console.log('scenario: jitter 0 sleeps after settling')
+        await runJitterZeroSleeps(page, errors)
+        errors.length = 0
+        console.log('scenario: live motion change is seamless')
+        await runLiveMotionChange(page, errors)
+        errors.length = 0
+      }
+      if (framework === 'svelte') {
+        console.log('scenario: Svelte playground controls and persistence')
+        await runSveltePlayground(page, errors)
+        errors.length = 0
+      }
+      console.log(
+        `scenario: ${framework} adapter lifecycle and failed GPU init`,
+      )
       await runLifecycle(page, errors)
       errors.length = 0
       console.log('scenario: resize during asynchronous backend initialization')
@@ -566,6 +899,11 @@ try {
       errors.length = 0
       console.log('scenario: retry after a transient image failure')
       await runRasterRetry(page, errors)
+      errors.length = 0
+      console.log(
+        `scenario: ${framework} props, references, reduced motion and cleanup`,
+      )
+      await runAdapterContract(page, errors)
       errors.length = 0
       console.log('scenario: WebGL and WebGPU compute/render parity')
       await runGpuParity(page, errors)

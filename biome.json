@@ -58,5 +58,8 @@
     "enabled": true,
     "useIgnoreFile": true,
     "clientKind": "git"
+  },
+  "files": {
+    "includes": ["**", "!**/*.svelte"]
   }
 }

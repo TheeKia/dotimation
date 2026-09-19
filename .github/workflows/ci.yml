@@ -31,7 +31,7 @@ jobs:
         run: bun run build
 
       - name: Validate distribution
-        run: bun scripts/check-dist.ts
+        run: bun run check:dist
 
       - name: Type check
         run: bun run type-check
@@ -41,6 +41,12 @@ jobs:
 
       - name: Run tests
         run: bun run test
+
+      - name: Build React playground
+        run: bun run --cwd apps/playground-react build
+
+      - name: Build Svelte playground
+        run: bun run --cwd apps/playground-svelte build
 
   e2e:
     name: E2E smoke (headless Chromium)
@@ -62,3 +68,9 @@ jobs:
 
       - name: Run e2e smoke
         run: bun run test:e2e
+
+      - name: Build packages
+        run: bun run build
+
+      - name: Verify packed consumers
+        run: bun run test:packages

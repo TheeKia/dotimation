@@ -20,7 +20,7 @@ See [AGENTS.md](AGENTS.md) for architecture, invariants, and repository commands
 
 ### Development Mode
 
-Run `bun run dev` - This starts the Vite playground (normally http://localhost:5173). It imports the library directly from `src/`; no package build is needed for live edits.
+Run `bun run dev` for React or `bun run dev:svelte` for Svelte (normally http://localhost:5173). Each Vite playground imports its adapter and core directly from workspace source; no package build is needed for live edits. Package boundaries and lifecycle ownership are documented in [docs/architecture.md](docs/architecture.md).
 
 ## Development Workflow
 
@@ -29,10 +29,13 @@ Run `bun run dev` - This starts the Vite playground (normally http://localhost:5
 3. Make your changes and test them live in the preview app
 4. Check and fix code style and formatting issues: `bun run lint:fix`
 5. Run `bun run type-check`, `bun test`, and `bun run test:e2e` (install Chromium once with `bunx playwright install chromium`).
-6. Build and validate the package: `bun run build && bun scripts/check-dist.ts`.
-7. Commit your changes using the conventions below
-8. Push your branch to your fork
-9. Open a pull request
+6. Build and validate all packages: `bun run build && bun run check:dist && bun run test:packages`. The last command installs packed artifacts into temporary, isolated consumers and checks their types, production output, SSR, and browser rendering.
+7. Build both playgrounds with `bun run --cwd apps/playground-react build` and `bun run --cwd apps/playground-svelte build`.
+8. Commit your changes using the conventions below
+9. Push your branch to your fork
+10. Open a pull request
+
+Formatting uses Biome for TypeScript/configuration and Prettier with its Svelte plugin for component files. Svelte semantic diagnostics run in `bun run type-check`. Shared options and behavior belong in core; adapters own framework lifecycle and DOM presentation.
 
 ## Commit Message Conventions
 

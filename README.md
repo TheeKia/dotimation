@@ -4,7 +4,7 @@
 [![CI](https://github.com/TheeKia/dotimation/actions/workflows/ci.yml/badge.svg)](https://github.com/TheeKia/dotimation/actions/workflows/ci.yml)
 [![license](https://img.shields.io/npm/l/dotimation)](./LICENSE)
 
-Animate anything with dots
+Animate anything with dots, in React or Svelte. Both components share the same animation engine, worker rasterizer, and rendering backends.
 
 ## Installation
 
@@ -12,7 +12,7 @@ Animate anything with dots
 bun add dotimation
 ```
 
-## Usage
+## React usage
 
 ```tsx
 import { Dotimation } from 'dotimation'
@@ -37,6 +37,38 @@ Or let the component track its parent's size:
   <Dotimation item={{ type: 'text', data: 'Hello' }} fill />
 </div>
 ```
+
+## Svelte usage
+
+The Svelte 5 adapter lives in `@dotimation/svelte` (new in this workspace; available from the registry after its first release).
+
+```bash
+bun add @dotimation/svelte
+```
+
+```svelte
+<script lang="ts">
+  import { Dotimation } from '@dotimation/svelte'
+
+  let text = $state('Hello Svelte')
+  let canvas = $state<HTMLCanvasElement>()
+</script>
+
+<Dotimation
+  item={{ type: 'text', data: text }}
+  width={320}
+  height={120}
+  motion={{ jitter: 0 }}
+  class="dots"
+  bind:canvas
+/>
+```
+
+Requires Svelte 5.29 or newer. All animation options below are shared. Svelte uses `class` and a CSS string for `style`, with `bind:canvas` in place of React's `ref`. Both references follow canvas replacements. Sizing props control width and height; use `fill` inside a container with a defined height for responsive sizing.
+
+Both adapters support server rendering: the server emits an accessible canvas with its CSS dimensions, and animation starts in the browser.
+
+## Shared API
 
 ### Props
 
@@ -134,6 +166,17 @@ Text using a custom `fontFamily` that hasn't finished loading is rasterized with
 | `idle="sleep"` (freeze after settle) | `motion={{ jitter: 0 }}` (calm/static) |
 | `idle="animate"` | default behavior — remove the prop |
 | `canvasRef={ref}` | `ref={ref}` |
+
+## Repository layout
+
+- `packages/core`: framework-independent runtime and rendering engine.
+- `packages/react`: the existing `dotimation` React package.
+- `packages/svelte`: the Svelte component package.
+- `apps/`: source-linked playgrounds for each framework.
+
+Run `bun run dev:svelte` to explore the Svelte playground: A/B text and image morphing, uploads, full animation controls, responsive sizing, saved settings, and copyable Svelte code. It follows the system motion preference by default.
+
+See [architecture and release process](docs/architecture.md) for package boundaries and validation.
 
 ## Contributing
 

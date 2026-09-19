@@ -1,0 +1,333 @@
+import { FIXED_DT, MAX_STEPS_PER_FRAME } from '../../engine/clock'
+import { snapField } from '../../engine/field'
+import type { SimParams } from '../../engine/params'
+import { planReconcile } from '../../engine/reconcile-plan'
+import type { Backend, ParticleField } from '../../types'
+import {
+  ensureScratch,
+  FADE_COMPLETE,
+  packStateInto,
+  packTargetsInto,
+  STATE_FLOATS,
+  STATE_STRIDE_BYTES,
+  TARGET_FLOATS,
+} from '../gpu-shared'
+import { createBuffers, disposeBuffers, type GPUBuffers } from './buffers'
+import { acquireGPU } from './device'
+import { createPipelines, type Pipelines } from './pipelines'
+
+export function createWebGPUBackend(initial: SimParams): Backend {
+  let device: GPUDevice | null = null
+  let context: GPUCanvasContext | null = null
+  let canvasEl: HTMLCanvasElement | null = null
+  let lastField: ParticleField | null = null
+  let disposed = false
+  let pipelines: Pipelines | null = null
+  let buffers: GPUBuffers | null = null
+  let devW = 0
+  let devH = 0
+  let dpr = 1
+  let count = 0
+  let active = 0
+  let lost = false
+  let fadeProgress = 0
+  let p = initial
+  let stateScratch = new Float32Array(1024 * STATE_FLOATS)
+  let targetScratch = new Float32Array(1024 * TARGET_FLOATS)
+
+  // Bind groups and uniform staging are stable across frames, so they are
+  // created once (and rebuilt only when the buffers are recreated) instead of
+  // per step/draw. simBindGroups is indexed by the ping-pong read index.
+  let simBindGroups: [GPUBindGroup, GPUBindGroup] | null = null
+  let renderBind: GPUBindGroup | null = null
+  // One backing buffer, two views: slot 6 (the jitter seed) is a u32 in the
+  // WGSL Params struct, the rest are f32.
+  const simUBytes = new ArrayBuffer(8 * 4)
+  const simU = new Float32Array(simUBytes)
+  const simUu32 = new Uint32Array(simUBytes)
+  const renderU = new Float32Array(4)
+  // The render uniforms (devW/devH/dpr/dotSize) change only on resize/dotSize,
+  // so the GPU write is skipped on frames where they are unchanged.
+  let renderUniformDirty = true
+  // Steps are accumulated by step() and flushed in draw() so the whole frame
+  // (all compute passes + the render pass) is one encoder / one submit.
+  let pendingSteps = 0
+  let stepDt = FIXED_DT
+
+  function releaseResources(): void {
+    // Detach the device first so its loss notification cannot start recovery.
+    const previous = device
+    device = null
+    if (buffers) disposeBuffers(buffers)
+    pipelines?.simUniform.destroy()
+    pipelines?.renderUniform.destroy()
+    previous?.destroy()
+    context = null
+    pipelines = null
+    buffers = null
+    simBindGroups = null
+    renderBind = null
+  }
+
+  async function setup(
+    canvas: HTMLCanvasElement,
+    signal?: AbortSignal,
+  ): Promise<void> {
+    const s = await acquireGPU(canvas, () => disposed || !!signal?.aborted)
+    device = s.device
+    context = s.context
+    // WebGPU validation errors are asynchronous; without a scope an invalid
+    // pipeline looks initialized and prevents the fallback tier from running.
+    device.pushErrorScope('validation')
+    let validationError: GPUError | null = null
+    try {
+      pipelines = createPipelines(device, s.format)
+      buffers = createBuffers(device, 1024)
+      rebuildBindGroups()
+    } finally {
+      validationError = await s.device.popErrorScope()
+    }
+    if (validationError) throw new Error(`webgpu: ${validationError.message}`)
+    watchLoss(s.device)
+  }
+
+  function watchLoss(d: GPUDevice): void {
+    void d.lost.then((info) => {
+      if (disposed || device !== d) return
+      lost = true
+      // 'destroyed' is our own dispose(); anything else (GPU reset, driver
+      // update, OS sleep) is recoverable by re-acquiring a device.
+      if (info.reason === 'destroyed') return
+      void recover()
+    })
+  }
+
+  async function recover(): Promise<void> {
+    if (!canvasEl || disposed) return
+    try {
+      releaseResources()
+      active = 0
+      count = 0
+      pendingSteps = 0
+      renderUniformDirty = true
+      await setup(canvasEl)
+      lost = false
+      // Re-seed from the last field and paint once, so the canvas isn't blank
+      // until the engine happens to wake.
+      if (lastField) {
+        snapField(lastField)
+        api.uploadField(lastField, true)
+        api.draw()
+      }
+    } catch {
+      // A failed replacement setup may already own a new device and buffers.
+      releaseResources()
+      lost = true
+    }
+  }
+
+  function rebuildBindGroups(): void {
+    if (!device || !pipelines || !buffers) return
+    const b = buffers
+    simBindGroups = [
+      pipelines.simBindGroup(b.state[0], b.state[1], b.targets),
+      pipelines.simBindGroup(b.state[1], b.state[0], b.targets),
+    ]
+    renderBind = pipelines.renderBindGroup()
+  }
+
+  function ensureCapacity(cap: number): void {
+    if (!device || !buffers || buffers.capacity >= cap) return
+    const old = buffers
+    const next = createBuffers(device, cap)
+    if (count > 0) {
+      const enc = device.createCommandEncoder()
+      enc.copyBufferToBuffer(
+        old.state[old.read],
+        0,
+        next.state[0],
+        0,
+        count * STATE_STRIDE_BYTES,
+      )
+      device.queue.submit([enc.finish()])
+    }
+    next.read = 0
+    disposeBuffers(old)
+    buffers = next
+    // The cached bind groups referenced the disposed buffers; rebuild them.
+    rebuildBindGroups()
+    stateScratch = ensureScratch(stateScratch, next.capacity * STATE_FLOATS)
+    targetScratch = ensureScratch(targetScratch, next.capacity * TARGET_FLOATS)
+  }
+
+  const api: Backend = {
+    async init(canvas, devicePixelRatio, signal): Promise<void> {
+      canvasEl = canvas
+      dpr = devicePixelRatio
+      devW = canvas.width
+      devH = canvas.height
+      await setup(canvas, signal)
+    },
+    uploadField(field: ParticleField, full = false): void {
+      lastField = field
+      if (!device || !buffers || lost) return
+      const plan = planReconcile(active, count, field.active)
+      ensureCapacity(field.capacity)
+      const b = buffers
+      const current = b.state[b.read]!
+
+      device.queue.writeBuffer(
+        b.targets,
+        0,
+        packTargetsInto(targetScratch, field, field.count),
+      )
+
+      if (full) {
+        // The CPU field was mutated outside reconcile (e.g. snapField), so the
+        // plan's diff doesn't describe it — re-upload the whole live state.
+        device.queue.writeBuffer(
+          current,
+          0,
+          packStateInto(stateScratch, field, 0, field.count),
+        )
+        active = field.active
+        count = field.count
+        fadeProgress = 0
+        return
+      }
+
+      if (plan.firstLoad) {
+        device.queue.writeBuffer(
+          current,
+          0,
+          packStateInto(stateScratch, field, 0, field.count),
+        )
+      } else if (plan.spawn) {
+        device.queue.writeBuffer(
+          current,
+          plan.spawn.start * STATE_STRIDE_BYTES,
+          packStateInto(stateScratch, field, plan.spawn.start, plan.spawn.end),
+        )
+      }
+
+      active = plan.active
+      count = plan.count
+      fadeProgress = 0
+    },
+    setParams(next: SimParams): void {
+      p = next
+      renderUniformDirty = true
+    },
+    step(dt: number): void {
+      if (!device || !buffers || !pipelines || !simBindGroups || lost) return
+      if (count <= 0) return
+      fadeProgress += dt * p.opacityRate
+      if (count > active && fadeProgress >= FADE_COMPLETE) {
+        count = active
+      }
+      // Record intent only — the GPU work is flushed once in draw() so the whole
+      // frame is one encoder / one submit.
+      stepDt = dt
+      pendingSteps++
+    },
+    draw(): void {
+      if (
+        !device ||
+        !context ||
+        !buffers ||
+        !pipelines ||
+        !renderBind ||
+        lost ||
+        devW <= 0 ||
+        devH <= 0
+      ) {
+        pendingSteps = 0
+        return
+      }
+      const b = buffers
+      const steps = Math.min(pendingSteps, MAX_STEPS_PER_FRAME)
+      pendingSteps = 0
+
+      if (steps > 0 && count > 0 && simBindGroups) {
+        simU[0] = stepDt
+        simU[1] = p.k
+        simU[2] = p.c
+        simU[3] = p.colorRate
+        simU[4] = p.opacityRate
+        simU[5] = p.jitter
+        simU[7] = count
+        // One slice per step, each with a fresh jitter seed (matching the
+        // other tiers' per-step reseed); the passes select their slice via
+        // dynamic offset since all writeBuffers land before the one submit.
+        for (let s = 0; s < steps; s++) {
+          simUu32[6] = (Math.random() * 0x100000000) >>> 0
+          device.queue.writeBuffer(
+            pipelines.simUniform,
+            s * pipelines.simUniformStride,
+            simU,
+          )
+        }
+      }
+      if (renderUniformDirty) {
+        renderU[0] = devW
+        renderU[1] = devH
+        renderU[2] = dpr
+        renderU[3] = p.dotSize
+        device.queue.writeBuffer(pipelines.renderUniform, 0, renderU)
+        renderUniformDirty = false
+      }
+
+      const enc = device.createCommandEncoder()
+
+      if (count > 0 && simBindGroups) {
+        // One compute pass per step: WebGPU inserts a barrier between passes, so
+        // the ping-pong write of pass N is visible to the read of pass N+1.
+        let r = b.read
+        for (let s = 0; s < steps; s++) {
+          const sim = enc.beginComputePass()
+          sim.setPipeline(pipelines.compute)
+          sim.setBindGroup(0, simBindGroups[r], [
+            s * pipelines.simUniformStride,
+          ])
+          sim.dispatchWorkgroups(Math.ceil(count / 64))
+          sim.end()
+          r ^= 1
+        }
+        b.read = r as 0 | 1
+      }
+
+      const view = context.getCurrentTexture().createView()
+      const pass = enc.beginRenderPass({
+        colorAttachments: [
+          {
+            view,
+            clearValue: { r: 0, g: 0, b: 0, a: 0 },
+            loadOp: 'clear',
+            storeOp: 'store',
+          },
+        ],
+      })
+      if (count > 0) {
+        pass.setPipeline(pipelines.render)
+        pass.setBindGroup(0, renderBind)
+        pass.setVertexBuffer(0, b.quad)
+        pass.setVertexBuffer(1, b.state[b.read]!)
+        pass.draw(4, count)
+      }
+      pass.end()
+      device.queue.submit([enc.finish()])
+    },
+    resize(w: number, h: number): void {
+      devW = w
+      devH = h
+      renderUniformDirty = true
+    },
+    dispose(): void {
+      disposed = true
+      releaseResources()
+      canvasEl = null
+      lastField = null
+    },
+  }
+  return api
+}

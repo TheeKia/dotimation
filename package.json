@@ -1,11 +1,10 @@
 {
-  "name": "dotimation",
+  "name": "dotimation-workspace",
   "version": "0.7.3",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/TheeKia/dotimation.git"
   },
-  "module": "./dist/index.js",
   "devDependencies": {
     "@biomejs/biome": "^2.5.3",
     "@types/bun": "^1.3.14",
@@ -13,52 +12,34 @@
     "@webgpu/types": "^0.1.71",
     "bunup": "^0.16.32",
     "playwright": "^1.62.0",
+    "prettier": "^3.9.8",
+    "prettier-plugin-svelte": "^4.1.1",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "simple-git-hooks": "^2.13.1",
     "typescript": "^6.0.3"
   },
-  "peerDependencies": {
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0",
-    "typescript": ">=5.0.0"
-  },
-  "exports": {
-    ".": {
-      "import": {
-        "types": "./dist/index.d.ts",
-        "default": "./dist/index.js"
-      }
-    },
-    "./package.json": "./package.json"
-  },
   "bugs": {
     "url": "https://github.com/TheeKia/dotimation/issues"
   },
-  "description": "Animate anything with dots",
-  "files": [
-    "dist"
-  ],
   "homepage": "https://github.com/TheeKia/dotimation#readme",
   "license": "MIT",
-  "peerDependenciesMeta": {
-    "typescript": {
-      "optional": true
-    }
-  },
   "scripts": {
-    "build": "bun scripts/build-worker.ts && bunup --env.NODE_ENV='production' --minify --no-sourcemap --target browser --footer '// built with love'",
+    "build": "bun run build:worker && bun run --cwd packages/core build && bun run --cwd packages/react build && bun run --cwd packages/svelte build",
     "build:worker": "bun scripts/build-worker.ts",
-    "dev": "bun scripts/build-worker.ts && bun run --cwd test/ui dev",
+    "dev": "bun run build:worker && bun run --cwd apps/playground-react dev",
     "prepare": "bun simple-git-hooks && bun scripts/build-worker.ts",
     "prepublishOnly": "bun run build && bun scripts/check-dist.ts",
-    "lint": "biome check .",
-    "lint:fix": "biome check --write .",
+    "lint": "biome check . && prettier --check \"**/*.svelte\"",
+    "lint:fix": "biome check --write . && prettier --write \"**/*.svelte\"",
     "test": "bun test",
-    "test:e2e": "bun scripts/build-worker.ts && bun test/e2e/smoke.e2e.ts",
+    "test:e2e": "bun run build:worker && bun scripts/test-e2e.ts",
     "test:coverage": "bun test --coverage",
     "test:watch": "bun test --watch",
-    "type-check": "tsc --noEmit && tsc --noEmit -p test/tsconfig.json"
+    "type-check": "tsc --noEmit && tsc --noEmit -p test/tsconfig.json && bun run --cwd packages/svelte type-check",
+    "dev:svelte": "bun run build:worker && bun run --cwd apps/playground-svelte dev",
+    "check:dist": "bun scripts/check-dist.ts",
+    "test:packages": "bun scripts/test-packages.ts"
   },
   "simple-git-hooks": {
     "pre-commit": "bun run lint && bun run type-check"
@@ -67,8 +48,9 @@
     "@bunup/dts"
   ],
   "type": "module",
-  "types": "./dist/index.d.ts",
   "workspaces": [
-    "test/**"
-  ]
+    "packages/*",
+    "apps/*"
+  ],
+  "private": true
 }

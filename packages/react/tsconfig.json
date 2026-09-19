@@ -1,0 +1,10 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "include": ["src"],
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "paths": {
+      "@dotimation/core": ["../core/src/index.ts"]
+    }
+  }
+}

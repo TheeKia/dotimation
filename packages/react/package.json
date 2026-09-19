@@ -1,0 +1,47 @@
+{
+  "name": "dotimation",
+  "version": "0.7.3",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/TheeKia/dotimation.git",
+    "directory": "packages/react"
+  },
+  "module": "./dist/index.js",
+  "peerDependencies": {
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "typescript": ">=5.0.0"
+  },
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      }
+    },
+    "./package.json": "./package.json"
+  },
+  "bugs": {
+    "url": "https://github.com/TheeKia/dotimation/issues"
+  },
+  "description": "Animate anything with dots \u2014 React component",
+  "files": [
+    "dist"
+  ],
+  "homepage": "https://github.com/TheeKia/dotimation#readme",
+  "license": "MIT",
+  "peerDependenciesMeta": {
+    "typescript": {
+      "optional": true
+    }
+  },
+  "type": "module",
+  "types": "./dist/index.d.ts",
+  "dependencies": {
+    "@dotimation/core": "workspace:*"
+  },
+  "scripts": {
+    "build": "bunup src/index.ts --env.NODE_ENV='production' --minify --no-sourcemap --target browser --banner '\"use client\";' --footer '// built with love' --preferred-tsconfig ./tsconfig.build.json",
+    "prepublishOnly": "bun run --cwd ../.. build && bun run --cwd ../.. check:dist"
+  }
+}
