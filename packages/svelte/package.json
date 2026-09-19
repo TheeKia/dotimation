@@ -1,6 +1,6 @@
 {
   "name": "@dotimation/svelte",
-  "version": "0.7.3",
+  "version": "0.8.0",
   "type": "module",
   "license": "MIT",
   "files": [
@@ -37,5 +37,5 @@
   "bugs": {
     "url": "https://github.com/TheeKia/dotimation/issues"
   },
-  "description": "Animate anything with dots \u2014 Svelte component"
+  "description": "Animate anything with dots — Svelte component"
 }
