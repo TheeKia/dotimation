@@ -39,6 +39,7 @@
     "type-check": "tsc --noEmit && tsc --noEmit -p test/tsconfig.json && bun run --cwd packages/svelte type-check",
     "dev:svelte": "bun run build:worker && bun run --cwd apps/playground-svelte dev",
     "check:dist": "bun scripts/check-dist.ts",
+    "pack:packages": "bun scripts/pack-packages.ts",
     "test:packages": "bun scripts/test-packages.ts"
   },
   "simple-git-hooks": {

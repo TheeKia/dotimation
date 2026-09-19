@@ -34,7 +34,7 @@ Bun is the only supported toolchain. Do not use npm/yarn/pnpm.
 - `bun run test:packages` — after building, packs all libraries and installs independent React and Svelte consumers in temporary directories. Checks declarations, production bundling, SSR/hydration, and browser rendering. Requires Chromium and package registry access/cache. The unpublished core is explicitly overridden with its tarball; no workspace/source resolution is used.
 - `bun run --cwd apps/playground-react build` / `bun run --cwd apps/playground-svelte build` — playground type checks and production builds.
 
-Pre-commit runs lint + type-check. CI checks build, distribution, types, lint, unit tests and playground builds on Linux/macOS/Windows. Browser and packed-consumer tests run on Linux.
+Pre-commit runs lint + type-check. CI checks builds, distribution and unit tests on Linux/macOS/Windows. Types, lint, playground builds, browser and packed-consumer tests run on Linux. CI and release share the reusable validation workflow; release publishes the exact tarballs verified by the consumer suite.
 
 ## Runtime ownership
 

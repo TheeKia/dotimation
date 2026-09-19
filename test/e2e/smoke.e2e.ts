@@ -9,6 +9,7 @@
  */
 import type { Page } from 'playwright'
 import { chromium } from 'playwright'
+import { withBrowserDiagnostics } from '../../scripts/browser-diagnostics'
 
 const framework = process.env.DOTIMATION_E2E_FRAMEWORK ?? 'react'
 const PORT = framework === 'svelte' ? 5274 : 5273
@@ -853,61 +854,67 @@ try {
     const context = await browser.newContext({
       viewport: { width: 1280, height: 800 },
     })
-    // The playground persists config in localStorage; nothing to reset in a
-    // fresh context. Collect page errors across both scenarios.
-    const errors: string[] = []
-    const page = await context.newPage()
-    page.on('console', (msg) => {
-      if (msg.type() === 'error') errors.push(msg.text())
-    })
-    page.on('pageerror', (err) => errors.push(String(err)))
+    await withBrowserDiagnostics(context, `e2e-${framework}`, async () => {
+      // The playground persists config in localStorage; nothing to reset in a
+      // fresh context. Collect page errors across both scenarios.
+      const errors: string[] = []
+      const page = await context.newPage()
+      page.on('console', (msg) => {
+        if (msg.type() === 'error') errors.push(msg.text())
+      })
+      page.on('pageerror', (err) => errors.push(String(err)))
 
-    if (process.env.DOTIMATION_E2E_ADAPTER_ONLY === '1') {
-      await runAdapterContract(page, errors)
-    } else if (process.env.DOTIMATION_E2E_GPU_ONLY === '1') {
-      await runGpuParity(page, errors)
-    } else {
-      if (framework === 'react') {
-        console.log('scenario: default')
-        await run(page, errors)
+      if (process.env.DOTIMATION_E2E_ADAPTER_ONLY === '1') {
+        await runAdapterContract(page, errors)
+      } else if (process.env.DOTIMATION_E2E_GPU_ONLY === '1') {
+        await runGpuParity(page, errors)
+      } else {
+        if (framework === 'react') {
+          console.log('scenario: default')
+          await run(page, errors)
+          errors.length = 0
+          console.log('scenario: prefers-reduced-motion')
+          await runReducedMotion(page, errors)
+          errors.length = 0
+          console.log('scenario: shimmer persists (jitter > 0 never sleeps)')
+          await runShimmerPersists(page, errors)
+          errors.length = 0
+          console.log('scenario: jitter 0 sleeps after settling')
+          await runJitterZeroSleeps(page, errors)
+          errors.length = 0
+          console.log('scenario: live motion change is seamless')
+          await runLiveMotionChange(page, errors)
+          errors.length = 0
+        }
+        if (framework === 'svelte') {
+          console.log('scenario: Svelte playground controls and persistence')
+          await runSveltePlayground(page, errors)
+          errors.length = 0
+        }
+        console.log(
+          `scenario: ${framework} adapter lifecycle and failed GPU init`,
+        )
+        await runLifecycle(page, errors)
         errors.length = 0
-        console.log('scenario: prefers-reduced-motion')
-        await runReducedMotion(page, errors)
+        console.log(
+          'scenario: resize during asynchronous backend initialization',
+        )
+        await runAsyncStartup(page, errors)
         errors.length = 0
-        console.log('scenario: shimmer persists (jitter > 0 never sleeps)')
-        await runShimmerPersists(page, errors)
+        console.log('scenario: retry after a transient image failure')
+        await runRasterRetry(page, errors)
         errors.length = 0
-        console.log('scenario: jitter 0 sleeps after settling')
-        await runJitterZeroSleeps(page, errors)
+        console.log(
+          `scenario: ${framework} props, references, reduced motion and cleanup`,
+        )
+        await runAdapterContract(page, errors)
         errors.length = 0
-        console.log('scenario: live motion change is seamless')
-        await runLiveMotionChange(page, errors)
-        errors.length = 0
+        console.log('scenario: WebGL and WebGPU compute/render parity')
+        await runGpuParity(page, errors)
       }
-      if (framework === 'svelte') {
-        console.log('scenario: Svelte playground controls and persistence')
-        await runSveltePlayground(page, errors)
-        errors.length = 0
-      }
-      console.log(
-        `scenario: ${framework} adapter lifecycle and failed GPU init`,
-      )
-      await runLifecycle(page, errors)
-      errors.length = 0
-      console.log('scenario: resize during asynchronous backend initialization')
-      await runAsyncStartup(page, errors)
-      errors.length = 0
-      console.log('scenario: retry after a transient image failure')
-      await runRasterRetry(page, errors)
-      errors.length = 0
-      console.log(
-        `scenario: ${framework} props, references, reduced motion and cleanup`,
-      )
-      await runAdapterContract(page, errors)
-      errors.length = 0
-      console.log('scenario: WebGL and WebGPU compute/render parity')
-      await runGpuParity(page, errors)
-    }
+      if (failures.length > 0)
+        throw new Error(`E2E checks failed: ${failures.join(', ')}`)
+    })
   } finally {
     await browser.close()
   }
@@ -915,10 +922,4 @@ try {
   vite.kill()
 }
 
-if (failures.length > 0) {
-  console.error(
-    `\n${failures.length} e2e check(s) failed: ${failures.join(', ')}`,
-  )
-  process.exit(1)
-}
 console.log('\ne2e smoke: all checks passed')

@@ -25,3 +25,7 @@ packages/core/src/raster/worker-source.ts
 
 .svelte-kit
 *.tsbuildinfo
+
+# CI package archives and browser failure diagnostics
+release-packages/
+test-results/

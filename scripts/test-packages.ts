@@ -2,6 +2,7 @@ import { cp, mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { chromium } from 'playwright'
+import { withBrowserDiagnostics } from './browser-diagnostics'
 
 const root = resolve(import.meta.dirname, '..')
 const temporary = await mkdtemp(join(tmpdir(), 'dotimation-consumers-'))
@@ -23,19 +24,27 @@ const installedVersion = async (name: string): Promise<string> =>
 try {
   const archives = new Map<string, string>()
   for (const name of ['core', 'react', 'svelte']) {
-    const archive = join(temporary, `${name}.tgz`)
-    await run(
-      [
-        'bun',
-        'pm',
-        'pack',
-        '--filename',
-        archive,
-        '--ignore-scripts',
-        '--quiet',
-      ],
-      join(root, 'packages', name),
+    const packageDirectory = process.env.DOTIMATION_PACKAGE_DIR
+    const archive = join(
+      packageDirectory ? resolve(root, packageDirectory) : temporary,
+      `${name}.tgz`,
     )
+    if (packageDirectory) {
+      if (!(await Bun.file(archive).exists()))
+        throw new Error(`Missing package archive: ${archive}`)
+    } else
+      await run(
+        [
+          'bun',
+          'pm',
+          'pack',
+          '--filename',
+          archive,
+          '--ignore-scripts',
+          '--quiet',
+        ],
+        join(root, 'packages', name),
+      )
     archives.set(name, archive)
   }
   for (const framework of ['react', 'svelte']) {
@@ -168,53 +177,64 @@ try {
       if (!ready) throw new Error(`${framework} consumer preview did not start`)
       const browser = await chromium.launch({ args: ['--no-sandbox'] })
       try {
-        const page = await browser.newPage()
-        const errors: string[] = []
-        page.on('pageerror', (error) => errors.push(error.message))
-        page.on('console', (message) => {
-          if (message.type() === 'error' || message.type() === 'warning')
-            errors.push(message.text())
-        })
-        for (const route of ['/', '/hydrated.html']) {
-          await page.goto(url + route)
-          const painted = (): Promise<void> =>
-            page
-              .waitForFunction(() => {
-                const canvas = document.querySelector('canvas')
-                if (canvas?.width !== 320 || canvas.height !== 120) return false
-                const probe = document.createElement('canvas')
-                probe.width = 320
-                probe.height = 120
-                const context = probe.getContext('2d', {
-                  willReadFrequently: true,
-                })!
-                context.drawImage(canvas, 0, 0)
-                return context
-                  .getImageData(0, 0, 320, 120)
-                  .data.some((value, index) => index % 4 === 3 && value > 0)
-              })
-              .then(() => {})
-          await painted()
-          if (
-            route === '/hydrated.html' &&
-            !(await page.evaluate(
-              'window.ssrCanvas === document.querySelector("canvas")',
-            ))
-          )
-            throw new Error('Hydration replaced the server canvas')
-          await page.evaluate("window.consumer.render('Updated package')")
-          await page.waitForFunction(
-            () =>
-              document.querySelector('canvas')?.getAttribute('aria-label') ===
-              'Updated package',
-          )
-          await painted()
-          await page.evaluate('window.consumer.unmount()')
-          await page.waitForFunction(() => !document.querySelector('canvas'))
-          if (errors.length) throw new Error(errors.join('\n'))
-        }
-        console.log(
-          `${framework}: packed types, production bundle, SSR, hydration and browser rendering passed`,
+        const context = await browser.newContext()
+        await withBrowserDiagnostics(
+          context,
+          `consumer-${framework}`,
+          async () => {
+            const page = await context.newPage()
+            const errors: string[] = []
+            page.on('pageerror', (error) => errors.push(error.message))
+            page.on('console', (message) => {
+              if (message.type() === 'error' || message.type() === 'warning')
+                errors.push(message.text())
+            })
+            for (const route of ['/', '/hydrated.html']) {
+              await page.goto(url + route)
+              const painted = (): Promise<void> =>
+                page
+                  .waitForFunction(() => {
+                    const canvas = document.querySelector('canvas')
+                    if (canvas?.width !== 320 || canvas.height !== 120)
+                      return false
+                    const probe = document.createElement('canvas')
+                    probe.width = 320
+                    probe.height = 120
+                    const context = probe.getContext('2d', {
+                      willReadFrequently: true,
+                    })!
+                    context.drawImage(canvas, 0, 0)
+                    return context
+                      .getImageData(0, 0, 320, 120)
+                      .data.some((value, index) => index % 4 === 3 && value > 0)
+                  })
+                  .then(() => {})
+              await painted()
+              if (
+                route === '/hydrated.html' &&
+                !(await page.evaluate(
+                  'window.ssrCanvas === document.querySelector("canvas")',
+                ))
+              )
+                throw new Error('Hydration replaced the server canvas')
+              await page.evaluate("window.consumer.render('Updated package')")
+              await page.waitForFunction(
+                () =>
+                  document
+                    .querySelector('canvas')
+                    ?.getAttribute('aria-label') === 'Updated package',
+              )
+              await painted()
+              await page.evaluate('window.consumer.unmount()')
+              await page.waitForFunction(
+                () => !document.querySelector('canvas'),
+              )
+              if (errors.length) throw new Error(errors.join('\n'))
+            }
+            console.log(
+              `${framework}: packed types, production bundle, SSR, hydration and browser rendering passed`,
+            )
+          },
         )
       } finally {
         await browser.close()
