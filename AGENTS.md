@@ -35,7 +35,7 @@ Bun is the supported toolchain for installation, builds, tests and packing. The 
 - `bun run --cwd apps/playground-react build` / `bun run --cwd apps/playground-svelte build` — playground type checks and production builds.
 - `bun run release <version> --dry-run` — preview release prerequisites and generated notes without mutations. Omit `--dry-run` to validate, bump all three published packages, commit, annotate and atomically push the release tag with `main`. Notes are generated from commits and saved to `docs/releases/<version>.md`; an existing file or `--notes <file>` overrides generation. See `docs/releases/README.md` for prerequisites and recovery. Stable releases use npm `latest`; prereleases use `next`.
 
-Pre-commit runs lint + type-check. CI checks builds, distribution and unit tests on Linux/macOS/Windows. Types, lint, playground builds, browser and packed-consumer tests run on Linux. CI and release share the reusable validation workflow; release publishes the exact tarballs verified by the consumer suite.
+Pre-commit runs lint + type-check. CI runs one comprehensive Linux job covering builds, distribution, unit tests, types, lint, playground builds, browser and packed-consumer tests. CI and release share the reusable validation workflow; release publishes the exact tarballs verified by the consumer suite.
 
 ## Runtime ownership
 
