@@ -19,7 +19,7 @@ Dependencies flow adapters → core. Core must never import a framework. Adapter
 
 ## Commands
 
-Bun is the only supported toolchain. Do not use npm/yarn/pnpm.
+Bun is the supported toolchain for installation, builds, tests and packing. The release job uses npm only to publish verified tarballs through Trusted Publishing (OIDC), which Bun does not yet support. Do not use npm/yarn/pnpm for dependency management or builds.
 
 - `bun install` — links workspaces, installs dependencies, sets hooks, generates the worker source.
 - `bun run dev` / `bun run dev:svelte` — React / Svelte source-linked playgrounds; no package build needed.

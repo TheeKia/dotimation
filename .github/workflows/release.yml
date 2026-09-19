@@ -39,22 +39,23 @@ jobs:
         with:
           bun-version-file: .bun-version
 
+      # npm 11.19.0 bundled with this Node release supports Trusted Publishing.
+      - name: Setup npm publisher
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24.21.0'
+          package-manager-cache: false
+
       - name: Download verified packages
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: release-packages
           path: release-packages
 
-      # Publish the exact archives tested by the consumer suite. Tarball
-      # publishing skips rebuild hooks; retries can finish partial releases.
+      # npm exchanges the GitHub OIDC identity for short-lived credentials.
+      # Publish the exact tested archives, skipping existing versions on retry.
       - name: Publish core, then adapters
-        run: |
-          bun publish ./release-packages/core.tgz --access public --tolerate-republish
-          bun publish ./release-packages/react.tgz --access public --tolerate-republish
-          bun publish ./release-packages/svelte.tgz --access public --tolerate-republish
-        env:
-          NPM_CONFIG_TOKEN: ${{ secrets.NPM_TOKEN }}
-          NPM_CONFIG_PROVENANCE: true
+        run: bun scripts/publish-packages.ts
 
       - name: Generate GitHub release notes
         run: bunx changelogithub@15.0.5
