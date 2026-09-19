@@ -235,3 +235,21 @@ describe('renderField scoped clear', () => {
     expect(view[0]).toBe(0)
   })
 })
+
+test('negative fractional positions clip consistently with GPU floor rounding', () => {
+  const f = reconcile(createField(1), one(-1, 2))
+  f.alpha[0] = 1
+  const view = new Uint32Array(64)
+  renderField(view, f, 8, 8, 1, 1)
+  expect(view.every((v) => v === 0)).toBe(true)
+  expect(computeDirtyRect(f, 8, 8, 1, 1)).toBeNull()
+})
+
+test('huge dots only loop over the visible canvas footprint', () => {
+  const f = reconcile(createField(1), one(-1, -1))
+  f.alpha[0] = 1
+  const view = new Uint32Array(64)
+  renderField(view, f, 8, 8, 1, 1e9)
+  expect(view.every((v) => v !== 0)).toBe(true)
+  expect(computeDirtyRect(f, 8, 8, 1, 1e9)).toEqual({ x: 0, y: 0, w: 8, h: 8 })
+})

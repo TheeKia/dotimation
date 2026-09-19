@@ -9,6 +9,17 @@ export interface SelectOptions {
   params: SimParams
   canvas: HTMLCanvasElement
   dpr: number
+  signal?: AbortSignal
+}
+
+/** A failed init may have permanently bound the canvas to its context type. */
+export class BackendRetryError extends Error {
+  readonly next: ConcreteBackend
+
+  constructor(next: ConcreteBackend, options: ErrorOptions) {
+    super(`dotimation: retry ${next} on a fresh canvas`, options)
+    this.next = next
+  }
 }
 
 async function construct(
@@ -25,42 +36,32 @@ async function construct(
 }
 
 /**
- * Constructs and initializes the best available backend, trying tiers in order
- * (GPU backends are dynamically imported / code-split) and falling through to
- * the next on any construct/init failure. Canvas2D is the always-present last
- * tier; if even it fails (canvas already bound to another context type), this
- * throws rather than returning a dead backend.
+ * Initializes the first available tier. A failed init can lock the canvas's
+ * context type, so the caller must catch BackendRetryError and remount a fresh
+ * canvas before requesting the next tier. Cancellation never triggers fallback.
  */
 export async function selectBackend(
   opts: SelectOptions,
 ): Promise<{ backend: Backend; kind: ConcreteBackend }> {
-  // Only the 'auto' path consults capabilities; an explicit request ignores
-  // them (see resolveBackendOrder), so skip the GL probe — and its context
-  // allocation — entirely for non-auto requests.
   const caps =
     opts.requested === 'auto'
       ? detectCapabilities()
       : { webgpu: false, webgl2: false }
-  const order = resolveBackendOrder(opts.requested, caps)
-  for (const kind of order) {
-    let be: Backend | undefined
-    try {
-      be = await construct(kind, opts.params)
-      await be.init(opts.canvas, opts.dpr)
-      return { backend: be, kind }
-    } catch (err) {
-      // Dispose any partially-initialized backend before trying the next tier.
-      be?.dispose()
-      if (typeof console !== 'undefined') {
-        console.info(
-          `[dotimation] ${kind} backend unavailable, trying next`,
-          err,
-        )
-      }
-    }
+  const [kind = 'canvas2d', next] = resolveBackendOrder(opts.requested, caps)
+  let be: Backend | undefined
+  try {
+    opts.signal?.throwIfAborted()
+    be = await construct(kind, opts.params)
+    opts.signal?.throwIfAborted()
+    await be.init(opts.canvas, opts.dpr, opts.signal)
+    opts.signal?.throwIfAborted()
+    return { backend: be, kind }
+  } catch (cause) {
+    be?.dispose()
+    opts.signal?.throwIfAborted()
+    if (next) throw new BackendRetryError(next, { cause })
+    throw new Error('dotimation: no rendering backend could initialize', {
+      cause,
+    })
   }
-  // Every tier failed — including Canvas2D, which only happens when the canvas
-  // is already bound to a different context type. Surface it; a silent blank
-  // canvas is undebuggable.
-  throw new Error('dotimation: no rendering backend could initialize')
 }

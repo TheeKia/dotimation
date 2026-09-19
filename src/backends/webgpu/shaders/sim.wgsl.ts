@@ -8,12 +8,12 @@ struct Params {
 @group(0) @binding(2) var<storage, read_write> stateOut: array<f32>;
 @group(0) @binding(3) var<storage, read> targets: array<f32>;
 
-// PCG output hash on u32 — uniform in [0, 1) (1.0 unreachable, matching the
-// CPU PRNG's toUnit contract), unlike fract(sin(x)*K) which bands at large x.
+// Use the top 24 hash bits so conversion to f32 cannot round up to 1.0.
+// This preserves the CPU PRNG's [0, 1) contract.
 fn hash01(v: u32) -> f32 {
   let state = v * 747796405u + 2891336453u;
   let word = ((state >> ((state >> 28u) + 4u)) ^ state) * 277803737u;
-  return f32((word >> 22u) ^ word) / 4294967296.0;
+  return f32(((word >> 22u) ^ word) >> 8u) / 16777216.0;
 }
 
 @compute @workgroup_size(64)

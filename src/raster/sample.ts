@@ -46,6 +46,7 @@ export function sampleTargets(
   rand: () => number = fastRand,
   max: number = Number.POSITIVE_INFINITY,
 ): FieldTargets {
+  if (max <= 0 || devW <= 0 || devH <= 0) return emptyFieldTargets()
   const step = Math.max(1, Math.round(spacingCss * dpr))
   // The grid has at most ceil(devW/step) * ceil(devH/step) cells, so the
   // candidate arrays are preallocated to that bound and filled with a cursor —

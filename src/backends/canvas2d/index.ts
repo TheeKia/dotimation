@@ -24,7 +24,7 @@ export function createCanvas2DBackend(initial: SimParams): Backend {
   let settledFlag: boolean | null = null
 
   function ensureBuffer(): void {
-    if (!ctx) return
+    if (!ctx || devW <= 0 || devH <= 0) return
     if (!imageData || imageData.width !== devW || imageData.height !== devH) {
       imageData = ctx.createImageData(devW, devH)
       view = new Uint32Array(imageData.data.buffer)

@@ -171,8 +171,8 @@ export function reconcile(
 /**
  * Completes the current morph instantly: every slot lands at its home with its
  * home color, velocities zeroed and alpha at its target; fully-faded faders are
- * dropped. Used for prefers-reduced-motion — content changes become opacity
- * fades with no movement. The result satisfies isFieldSettled.
+ * dropped. Used for prefers-reduced-motion — content changes appear immediately
+ * with no movement or fade. The result satisfies isFieldSettled.
  */
 export function snapField(field: ParticleField): void {
   const {

@@ -9,9 +9,10 @@ describe('tuneSpring', () => {
 })
 
 describe('computeSettleDuration', () => {
-  test('covers spring settle plus opacity fade', () => {
-    const d = computeSettleDuration(0.85, 2)
+  test('covers spring, opacity, and worst-case color convergence', () => {
+    const d = computeSettleDuration(0.85, 2, 2)
     expect(d).toBeGreaterThanOrEqual(0.85)
-    expect(d).toBeLessThan(3)
+    expect(255 * Math.exp(-2 * d)).toBeLessThan(0.5)
+    expect(d).toBeLessThan(4)
   })
 })

@@ -22,7 +22,7 @@ function loadBitmap(src: string): Promise<ImageBitmap> {
     return createImageBitmap(await res.blob())
   })()
   // Drop failed loads so a later request can retry them.
-  loading.catch(() => bitmapCache.delete(src))
+  loading.catch(() => bitmapCache.delete(src, loading))
   bitmapCache.set(src, loading)
   return loading
 }

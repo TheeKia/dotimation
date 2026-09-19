@@ -7,7 +7,7 @@
 export interface AsyncLru<V> {
   get(key: string): Promise<V> | undefined
   set(key: string, value: Promise<V>): void
-  delete(key: string): void
+  delete(key: string, expected?: Promise<V>): void
 }
 
 export function createAsyncLru<V>(
@@ -34,8 +34,8 @@ export function createAsyncLru<V>(
         if (evicted !== undefined) onEvict?.(evicted)
       }
     },
-    delete(key): void {
-      map.delete(key)
+    delete(key, expected): void {
+      if (expected === undefined || map.get(key) === expected) map.delete(key)
     },
   }
 }

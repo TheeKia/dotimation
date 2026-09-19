@@ -2,6 +2,8 @@
 
 Thank you for your interest in contributing to our project! This guide will help you get started with the development process.
 
+See [AGENTS.md](AGENTS.md) for architecture, invariants, and repository commands.
+
 ## Development Setup
 
 ### Prerequisites
@@ -18,7 +20,7 @@ Thank you for your interest in contributing to our project! This guide will help
 
 ### Development Mode
 
-Run `bun run dev` - This starts a Bun + React preview app at http://localhost:3000 to test components in real-time.
+Run `bun run dev` - This starts the Vite playground (normally http://localhost:5173). It imports the library directly from `src/`; no package build is needed for live edits.
 
 ## Development Workflow
 
@@ -26,10 +28,11 @@ Run `bun run dev` - This starts a Bun + React preview app at http://localhost:30
 2. Start development mode: `bun run dev`
 3. Make your changes and test them live in the preview app
 4. Check and fix code style and formatting issues: `bun run lint:fix`
-5. Build the project: `bun run build`
-6. Commit your changes using the conventions below
-7. Push your branch to your fork
-8. Open a pull request
+5. Run `bun run type-check`, `bun test`, and `bun run test:e2e` (install Chromium once with `bunx playwright install chromium`).
+6. Build and validate the package: `bun run build && bun scripts/check-dist.ts`.
+7. Commit your changes using the conventions below
+8. Push your branch to your fork
+9. Open a pull request
 
 ## Commit Message Conventions
 

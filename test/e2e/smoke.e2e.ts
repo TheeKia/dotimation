@@ -301,6 +301,217 @@ async function runLiveMotionChange(
   )
 }
 
+async function runLifecycle(page: Page, errors: string[]): Promise<void> {
+  await page.goto(`${URL}/lifecycle.html`)
+  await page.waitForFunction(
+    () => (window.lifecycle?.stats?.particles ?? 0) > 0,
+  )
+  await page.waitForTimeout(1000)
+  check(
+    'fill starts at parent size and paints in StrictMode',
+    (await paintedPixels(page)) > 100,
+  )
+  check(
+    'fill retains percentage CSS sizing',
+    await page
+      .locator('canvas')
+      .evaluate(
+        (canvas) =>
+          canvas.style.width === '100%' && canvas.style.height === '100%',
+      ),
+  )
+  await page.evaluate(() => window.lifecycle.resize(480, 180))
+  await page.waitForFunction(
+    () =>
+      document.querySelector('canvas')?.width ===
+      Math.round(480 * Math.min(devicePixelRatio, 2)),
+  )
+  await page.waitForTimeout(1000)
+  check('fill follows parent resize', (await paintedPixels(page)) > 100)
+  await page.evaluate(() => window.lifecycle.resize(0, 0))
+  await page.waitForFunction(
+    () => document.querySelector('canvas')?.width === 0,
+  )
+  await page.evaluate(() => window.lifecycle.resize(320, 120))
+  await page.waitForFunction(
+    () =>
+      document.querySelector('canvas')?.width ===
+      Math.round(320 * Math.min(devicePixelRatio, 2)),
+  )
+  await page.waitForTimeout(1000)
+  check(
+    'canvas recovers after zero-size parent',
+    (await paintedPixels(page)) > 100,
+  )
+
+  check(
+    'WebGL context restoration paints without an engine wake',
+    (await page.evaluate(() => window.lifecycle.verifyRestore())) > 0,
+  )
+
+  // Force an init failure AFTER WebGL has bound the canvas to its context.
+  await page.evaluate(() => {
+    WebGL2RenderingContext.prototype.createShader = () => null
+    window.lifecycle.render({ backend: 'webgl2' })
+  })
+  await page.waitForFunction(
+    () =>
+      window.lifecycle.stats?.backend === 'canvas2d' &&
+      !!document.querySelector('canvas')?.getContext('2d'),
+  )
+  await page.waitForTimeout(1000)
+  check(
+    'failed GPU init falls back on a fresh canvas',
+    (await paintedPixels(page)) > 100,
+  )
+  check(
+    'no console errors during lifecycle regressions',
+    errors.length === 0,
+    errors.join(' | '),
+  )
+}
+
+async function runAsyncStartup(page: Page, errors: string[]): Promise<void> {
+  // Hold backend init after it caches the initial dimensions, then resize the
+  // DOM canvas before init resolves. This makes the startup race deterministic.
+  await page.route('**/backends/webgpu/index.ts*', (route) =>
+    route.fulfill({
+      contentType: 'text/javascript',
+      body: `import { createCanvas2DBackend } from '../canvas2d/index.ts';
+      export function createWebGPUBackend(params) {
+        const backend = createCanvas2DBackend(params);
+        let canvas;
+        return { ...backend,
+          async init(element, dpr) {
+            canvas = element;
+            backend.init(canvas, dpr);
+            canvas.dataset.initializing = 'true';
+            await new Promise(resolve => window.addEventListener('release-backend', resolve, { once: true }));
+          },
+          resize(w, h) { canvas.dataset.backendSize = w + ':' + h; backend.resize(w, h); }
+        };
+      }`,
+    }),
+  )
+  try {
+    await page.goto(`${URL}/lifecycle.html`)
+    await page.waitForFunction(() => !!window.lifecycle?.stats)
+    await page.evaluate(() => {
+      window.lifecycle.stats = null
+      window.lifecycle.render({ backend: 'webgpu' })
+    })
+    await page.waitForSelector('canvas[data-initializing="true"]')
+    await page.evaluate(() => window.lifecycle.resize(480, 180))
+    await page.waitForFunction(
+      () =>
+        document.querySelector('canvas')?.width ===
+        Math.round(480 * Math.min(devicePixelRatio, 2)),
+    )
+    await page.evaluate(() =>
+      window.dispatchEvent(new Event('release-backend')),
+    )
+    await page.waitForFunction(
+      () => window.lifecycle.stats?.backend === 'webgpu',
+    )
+    check(
+      'async backend receives size changes made during init',
+      await page
+        .locator('canvas')
+        .evaluate(
+          (canvas) =>
+            canvas.dataset.backendSize === `${canvas.width}:${canvas.height}`,
+        ),
+    )
+    await page.waitForTimeout(1000)
+    check('async startup still paints', (await paintedPixels(page)) > 100)
+    check(
+      'no console errors during async startup',
+      errors.length === 0,
+      errors.join(' | '),
+    )
+  } finally {
+    await page.unroute('**/backends/webgpu/index.ts*')
+  }
+}
+
+async function runRasterRetry(page: Page, errors: string[]): Promise<void> {
+  await page.goto(`${URL}/lifecycle.html`)
+  await page.waitForFunction(
+    () => (window.lifecycle?.stats?.particles ?? 0) > 0,
+  )
+  const failed = page.waitForEvent('console', {
+    predicate: (message) =>
+      message.type() === 'warning' &&
+      message.text().includes('rasterization failed'),
+  })
+  await page.evaluate(() => {
+    Object.defineProperty(window, 'Worker', {
+      configurable: true,
+      value: undefined,
+    })
+    const decode = HTMLImageElement.prototype.decode
+    HTMLImageElement.prototype.decode = () => {
+      HTMLImageElement.prototype.decode = decode
+      return Promise.reject(new Error('intentional one-time decode failure'))
+    }
+    window.lifecycle.stats = null
+    window.lifecycle.render({
+      item: {
+        type: 'image',
+        data:
+          'data:image/svg+xml,' +
+          encodeURIComponent(
+            '<svg xmlns="http://www.w3.org/2000/svg" width="100" height="40"><rect width="100" height="40" fill="red"/></svg>',
+          ),
+      },
+    })
+  })
+  await failed
+  // The item object is retained by the fixture; only an unrelated prop changes.
+  await page.evaluate(() => window.lifecycle.render({ className: 'retry' }))
+  await page.waitForFunction(() => (window.lifecycle.stats?.particles ?? 0) > 0)
+  await page.waitForTimeout(1000)
+  check(
+    'failed image decode retries on a later render with unchanged raster inputs',
+    (await paintedPixels(page)) > 100,
+  )
+  check(
+    'no console errors during raster retry',
+    errors.length === 0,
+    errors.join(' | '),
+  )
+}
+
+async function runGpuParity(page: Page, errors: string[]): Promise<void> {
+  await page.goto(`${URL}/lifecycle.html`)
+  await page.waitForFunction(() => !!window.lifecycle?.stats)
+  for (const kind of ['webgl2', 'webgpu'] as const) {
+    const result = await page.evaluate(
+      (kind) => window.lifecycle.verifyGpu(kind),
+      kind,
+    )
+    check(
+      `${kind} renders a full state upload`,
+      result.initial === 1,
+      JSON.stringify(result),
+    )
+    check(
+      `${kind} grows buffers and simulates new particles`,
+      result.grown === 2048,
+    )
+    check(
+      `${kind} preserves faders when fade speed changes`,
+      result.duringFade > 1,
+    )
+    check(`${kind} eventually removes faders`, result.afterFade === 1)
+  }
+  check(
+    'no console errors during GPU parity checks',
+    errors.length === 0,
+    errors.join(' | '),
+  )
+}
+
 const vite = Bun.spawn(
   ['bunx', '--bun', 'vite', '--port', String(PORT), '--strictPort'],
   { cwd: 'test/ui', stdout: 'ignore', stderr: 'pipe' },
@@ -309,7 +520,12 @@ const vite = Bun.spawn(
 try {
   await waitForServer()
   const browser = await chromium.launch({
-    args: ['--no-sandbox', '--enable-unsafe-swiftshader'],
+    args: [
+      '--no-sandbox',
+      '--enable-unsafe-swiftshader',
+      '--enable-unsafe-webgpu',
+      `--use-angle=${process.env.DOTIMATION_E2E_ANGLE ?? 'swiftshader'}`,
+    ],
   })
   try {
     const context = await browser.newContext({
@@ -324,20 +540,36 @@ try {
     })
     page.on('pageerror', (err) => errors.push(String(err)))
 
-    console.log('scenario: default')
-    await run(page, errors)
-    errors.length = 0
-    console.log('scenario: prefers-reduced-motion')
-    await runReducedMotion(page, errors)
-    errors.length = 0
-    console.log('scenario: shimmer persists (jitter > 0 never sleeps)')
-    await runShimmerPersists(page, errors)
-    errors.length = 0
-    console.log('scenario: jitter 0 sleeps after settling')
-    await runJitterZeroSleeps(page, errors)
-    errors.length = 0
-    console.log('scenario: live motion change is seamless')
-    await runLiveMotionChange(page, errors)
+    if (process.env.DOTIMATION_E2E_GPU_ONLY === '1') {
+      await runGpuParity(page, errors)
+    } else {
+      console.log('scenario: default')
+      await run(page, errors)
+      errors.length = 0
+      console.log('scenario: prefers-reduced-motion')
+      await runReducedMotion(page, errors)
+      errors.length = 0
+      console.log('scenario: shimmer persists (jitter > 0 never sleeps)')
+      await runShimmerPersists(page, errors)
+      errors.length = 0
+      console.log('scenario: jitter 0 sleeps after settling')
+      await runJitterZeroSleeps(page, errors)
+      errors.length = 0
+      console.log('scenario: live motion change is seamless')
+      await runLiveMotionChange(page, errors)
+      errors.length = 0
+      console.log('scenario: fill, zero size, StrictMode and failed GPU init')
+      await runLifecycle(page, errors)
+      errors.length = 0
+      console.log('scenario: resize during asynchronous backend initialization')
+      await runAsyncStartup(page, errors)
+      errors.length = 0
+      console.log('scenario: retry after a transient image failure')
+      await runRasterRetry(page, errors)
+      errors.length = 0
+      console.log('scenario: WebGL and WebGPU compute/render parity')
+      await runGpuParity(page, errors)
+    }
   } finally {
     await browser.close()
   }

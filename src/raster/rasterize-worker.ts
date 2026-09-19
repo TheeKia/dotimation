@@ -67,10 +67,12 @@ function getWorker(): Worker | null {
     const url = URL.createObjectURL(
       new Blob([WORKER_SOURCE], { type: 'text/javascript' }),
     )
-    worker = new Worker(url, { type: 'module' })
-    // The worker has its own reference to the resource now, so the object URL
-    // can be released immediately instead of leaking for the page's lifetime.
-    URL.revokeObjectURL(url)
+    try {
+      worker = new Worker(url, { type: 'module' })
+    } finally {
+      // Also release the URL when CSP or the constructor rejects the worker.
+      URL.revokeObjectURL(url)
+    }
     worker.onmessage = (e: MessageEvent): void => {
       const { id, targets, error } = e.data as {
         id: number
@@ -116,20 +118,27 @@ export function rasterizeViaWorker(
   const id = nextId++
   return new Promise<FieldTargets>((resolve, reject) => {
     const timer = setTimeout(() => {
-      take(id)?.reject(new Error('worker: timed out'))
-      armIdleTimer()
+      failAll(new Error('worker: timed out'))
     }, REQUEST_TIMEOUT_MS)
     pending.set(id, { resolve, reject, timer })
-    w.postMessage({
-      id,
-      item,
-      width,
-      height,
-      defaultFontFamily,
-      threshold,
-      spacingCss,
-      max,
-      dpr,
-    })
+    try {
+      w.postMessage({
+        id,
+        item:
+          item.type === 'image'
+            ? { ...item, data: new URL(item.data, document.baseURI).href }
+            : item,
+        width,
+        height,
+        defaultFontFamily,
+        threshold,
+        spacingCss,
+        max,
+        dpr,
+      })
+    } catch (error) {
+      take(id)?.reject(error)
+      armIdleTimer()
+    }
   })
 }

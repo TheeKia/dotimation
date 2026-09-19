@@ -1,9 +1,10 @@
+import { snapField } from '@/engine/field'
 import type { SimParams } from '@/engine/params'
 import { planReconcile } from '@/engine/reconcile-plan'
 import type { Backend, ParticleField } from '@/types'
 import {
   ensureScratch,
-  fadeDurationMs,
+  FADE_COMPLETE,
   packStateInto,
   packTargetsInto,
   STATE_FLOATS,
@@ -27,7 +28,7 @@ export function createWebGL2Backend(initial: SimParams): Backend {
   let count = 0
   let active = 0
   let lost = false
-  let lastUpload = 0
+  let fadeProgress = 0
   let p = initial
   let lastField: ParticleField | null = null
   let stateScratch = new Float32Array(1024 * STATE_FLOATS)
@@ -50,7 +51,8 @@ export function createWebGL2Backend(initial: SimParams): Backend {
     // Re-seed from the last field and paint once, so the canvas isn't blank
     // until the engine happens to wake.
     if (lastField) {
-      api.uploadField(lastField)
+      snapField(lastField)
+      api.uploadField(lastField, true)
       api.draw()
     }
   }
@@ -121,8 +123,8 @@ export function createWebGL2Backend(initial: SimParams): Backend {
   const api: Backend = {
     init,
     uploadField(field: ParticleField, full = false): void {
-      if (!gl || !buffers) return
       lastField = field
+      if (!gl || !buffers || lost) return
       const plan = planReconcile(active, count, field.active) // field.active == new targets.count
       ensureCapacity(field.capacity)
       const b = buffers
@@ -147,7 +149,7 @@ export function createWebGL2Backend(initial: SimParams): Backend {
         )
         active = field.active
         count = field.count
-        lastUpload = performance.now()
+        fadeProgress = 0
         return
       }
 
@@ -176,7 +178,7 @@ export function createWebGL2Backend(initial: SimParams): Backend {
 
       active = plan.active
       count = plan.count
-      lastUpload = performance.now()
+      fadeProgress = 0
     },
     setParams(next: SimParams): void {
       p = next
@@ -184,10 +186,8 @@ export function createWebGL2Backend(initial: SimParams): Backend {
     step(dt: number): void {
       if (!gl || !buffers || !sim || lost || count <= 0) return
       // Drop fully-faded faders (the GPU sim never shrinks count itself).
-      if (
-        count > active &&
-        performance.now() - lastUpload > fadeDurationMs(p.opacityRate)
-      ) {
+      fadeProgress += dt * p.opacityRate
+      if (count > active && fadeProgress >= FADE_COMPLETE) {
         count = active
       }
       const b = buffers

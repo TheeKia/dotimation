@@ -15,18 +15,20 @@ export function useFontEpoch(
   const family =
     item.type === 'text' ? (item.fontFamily ?? defaultFontFamily) : null
 
+  const text = item.type === 'text' ? item.data : ''
+
   useEffect(() => {
     if (family === null || isGenericFamily(family)) return
     if (typeof document === 'undefined' || !document.fonts) return
     let cancelled = false
     try {
-      if (document.fonts.check(`16px ${family}`)) return
+      if (document.fonts.check(`16px ${family}`, text)) return
     } catch {
       // Unparseable family string — nothing to wait for.
       return
     }
     document.fonts
-      .load(`16px ${family}`)
+      .load(`16px ${family}`, text)
       .then((faces) => {
         // load() resolves with [] when no matching @font-face exists; only a
         // real arrival warrants a re-raster.
@@ -36,7 +38,7 @@ export function useFontEpoch(
     return () => {
       cancelled = true
     }
-  }, [family])
+  }, [family, text])
 
   return epoch
 }

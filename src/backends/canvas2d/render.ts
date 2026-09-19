@@ -40,8 +40,8 @@ export function computeDirtyRect(
   let maxY = -Infinity
   for (let i = 0; i < count; i++) {
     if (alpha[i]! <= 0) continue
-    const bx = (x[i]! * dpr + 0.5) | 0
-    const by = (y[i]! * dpr + 0.5) | 0
+    const bx = Math.floor(x[i]! * dpr + 0.5)
+    const by = Math.floor(y[i]! * dpr + 0.5)
     if (bx < minX) minX = bx
     if (by < minY) minY = by
     if (bx > maxX) maxX = bx
@@ -119,7 +119,7 @@ function compositePixel(
 
 /**
  * Renders the field into a Uint32Array view of an RGBA buffer with manual
- * source-over compositing. `dotSize` is the square footprint in device pixels;
+ * source-over compositing. `dotSize` is the square footprint in CSS pixels;
  * the common dotSize===1 case takes a single-pixel fast path that skips the
  * nested footprint loops entirely.
  */
@@ -151,9 +151,9 @@ export function renderField(
     for (let i = 0; i < count; i++) {
       const sa = alpha[i]!
       if (sa <= 0) continue
-      const baseX = (x[i]! * dpr + 0.5) | 0
+      const baseX = Math.floor(x[i]! * dpr + 0.5)
       if (baseX < 0 || baseX >= devW) continue
-      const baseY = (y[i]! * dpr + 0.5) | 0
+      const baseY = Math.floor(y[i]! * dpr + 0.5)
       if (baseY < 0 || baseY >= devH) continue
       const clampedA = sa >= 1 ? 1 : sa
       compositePixel(
@@ -175,15 +175,14 @@ export function renderField(
     const sr = clamp255(r[i]!)
     const sg = clamp255(g[i]!)
     const sb = clamp255(b[i]!)
-    const baseX = (x[i]! * dpr + 0.5) | 0
-    const baseY = (y[i]! * dpr + 0.5) | 0
+    const baseX = Math.floor(x[i]! * dpr + 0.5)
+    const baseY = Math.floor(y[i]! * dpr + 0.5)
 
-    for (let oy = 0; oy < size; oy++) {
-      const yDev = baseY + oy
-      if (yDev < 0 || yDev >= devH) continue
-      for (let ox = 0; ox < size; ox++) {
-        const xDev = baseX + ox
-        if (xDev < 0 || xDev >= devW) continue
+    // Clip before looping so huge/offscreen dots cost only visible pixels.
+    const xEnd = Math.min(devW, baseX + size)
+    const yEnd = Math.min(devH, baseY + size)
+    for (let yDev = Math.max(0, baseY); yDev < yEnd; yDev++) {
+      for (let xDev = Math.max(0, baseX); xDev < xEnd; xDev++) {
         compositePixel(view, yDev * devW + xDev, sr, sg, sb, clampedA)
       }
     }

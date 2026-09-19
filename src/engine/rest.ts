@@ -8,7 +8,7 @@ const VEL_EPS_SQ = 0.05 * 0.05 // (px/s)^2 — spring essentially stopped
 const POS_EPS = 1 // px from home; loose enough for the ±0.5px jitter, tight
 // enough to catch a not-yet-moved particle (0-step first frame on a high-refresh
 // display has ~0 velocity but a large position error).
-const COLOR_EPS = 0.5 // within half an 8-bit level of the home color
+export const COLOR_EPS: number = 0.5 // within half an 8-bit level of the home color
 const ALPHA_EPS = 0.01
 
 /** Per-slot convergence predicate; isFieldSettled and stepField share it. */

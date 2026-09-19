@@ -86,6 +86,7 @@ export function useFieldTargets(
   const schedule = useRef<((job: RasterJob) => void) | null>(null)
   if (schedule.current === null) {
     schedule.current = createLatestWins<RasterJob>(async ({ inputs, id }) => {
+      if (id !== executionId.current) return
       try {
         const t = await runRasterize(inputs)
         if (id === executionId.current) setTargets(t)
@@ -102,6 +103,15 @@ export function useFieldTargets(
       }
     })
   }
+
+  useEffect(
+    () => () => {
+      // Invalidate in-flight and queued work, including StrictMode's replay.
+      executionId.current++
+      prev.current = null
+    },
+    [],
+  )
 
   useEffect(() => {
     const next: RasterInputs = {
@@ -128,18 +138,7 @@ export function useFieldTargets(
       return
     }
     schedule.current?.({ inputs: next, id })
-  }, [
-    width,
-    height,
-    item,
-    defaultFontFamily,
-    threshold,
-    spacing,
-    max,
-    maxDpr,
-    dprEpoch,
-    fontEpoch,
-  ])
+  }) // Check each commit: a failed request can retry even when props are referentially stable.
 
   return targets
 }

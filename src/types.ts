@@ -62,7 +62,11 @@ export interface DotimationStats {
 }
 
 export interface Backend {
-  init(canvas: HTMLCanvasElement, dpr: number): Promise<void> | void
+  init(
+    canvas: HTMLCanvasElement,
+    dpr: number,
+    signal?: AbortSignal,
+  ): Promise<void> | void
   /**
    * Push the reconciled CPU field. `full` forces a complete state re-upload
    * (GPU tiers adopt field.active/count verbatim instead of diffing via

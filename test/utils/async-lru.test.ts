@@ -53,3 +53,16 @@ describe('createAsyncLru', () => {
     expect(lru.get('b')).toBeDefined()
   })
 })
+
+test('a stale rejection cannot delete a replacement load of the same URL', () => {
+  const lru = createAsyncLru<number>(1)
+  const old = Promise.resolve(1)
+  const replacement = Promise.resolve(2)
+  lru.set('image', old)
+  lru.set('other', Promise.resolve(3))
+  lru.set('image', replacement)
+  lru.delete('image', old)
+  expect(lru.get('image')).toBe(replacement)
+  lru.delete('image', replacement)
+  expect(lru.get('image')).toBeUndefined()
+})

@@ -42,24 +42,32 @@ export function createProgram(
 ): WebGLProgram {
   const program = gl.createProgram()
   if (!program) throw new Error('webgl2: createProgram failed')
-  const vert = compileShader(gl, gl.VERTEX_SHADER, vertSrc)
-  const frag = compileShader(gl, gl.FRAGMENT_SHADER, fragSrc)
-  gl.attachShader(program, vert)
-  gl.attachShader(program, frag)
-  if (feedbackVaryings) {
-    gl.transformFeedbackVaryings(
-      program,
-      feedbackVaryings,
-      gl.INTERLEAVED_ATTRIBS,
-    )
-  }
-  gl.linkProgram(program)
-  gl.deleteShader(vert)
-  gl.deleteShader(frag)
-  if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-    const log = gl.getProgramInfoLog(program)
+  let vert: WebGLShader | null = null
+  let frag: WebGLShader | null = null
+  try {
+    vert = compileShader(gl, gl.VERTEX_SHADER, vertSrc)
+    frag = compileShader(gl, gl.FRAGMENT_SHADER, fragSrc)
+    gl.attachShader(program, vert)
+    gl.attachShader(program, frag)
+    if (feedbackVaryings) {
+      gl.transformFeedbackVaryings(
+        program,
+        feedbackVaryings,
+        gl.INTERLEAVED_ATTRIBS,
+      )
+    }
+    gl.linkProgram(program)
+    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+      throw new Error(
+        `webgl2: program link failed: ${gl.getProgramInfoLog(program)}`,
+      )
+    }
+    return program
+  } catch (error) {
     gl.deleteProgram(program)
-    throw new Error(`webgl2: program link failed: ${log}`)
+    throw error
+  } finally {
+    if (vert) gl.deleteShader(vert)
+    if (frag) gl.deleteShader(frag)
   }
-  return program
 }

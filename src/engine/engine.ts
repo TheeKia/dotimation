@@ -1,5 +1,6 @@
 import type { Backend, ParticleField } from '@/types'
 import { accumulate, FIXED_DT } from './clock'
+import { snapField } from './field'
 import type { SimParams } from './params'
 import { computeSettleDuration } from './settle'
 
@@ -34,6 +35,7 @@ export function createEngine(opts: EngineOptions): Engine {
   let settleSeconds = computeSettleDuration(
     opts.params.settleTime,
     opts.params.opacityRate,
+    opts.params.colorRate,
   )
   // `continuous` is what jitter alone asks for; the loop policy everywhere
   // below reads `continuous && hasContent` — an empty ACTIVE layout (no
@@ -42,30 +44,36 @@ export function createEngine(opts: EngineOptions): Engine {
   // regardless of jitter (see setField for why `active`, not `count`).
   let continuous = opts.params.jitter > 0
   let hasContent = false
+  let currentField: ParticleField | null = null
   let rafId = 0
   let running = false
   let last = 0
   let accumulator = 0
-  let awakeUntil = 0
+  let remaining = 0
+  let needsFrame = false
+  let disposed = false
   let visible = true
 
   const loop = (now: number): void => {
+    if (disposed) return
     const r = accumulate(accumulator, (now - last) / 1000)
     last = now
     accumulator = r.accumulator
+    remaining -= r.steps * FIXED_DT
     for (let i = 0; i < r.steps; i++) backend.step(FIXED_DT)
-    // Draw unconditionally while running: a skipped present is what made
-    // cleared-buffer flicker possible on high-refresh displays, and skipping
-    // was only ever worth it when preserveDrawingBuffer paid for it on every
-    // real present.
+    const finish =
+      !(continuous && hasContent) && (remaining <= 0 || !!backend.settled?.())
+    if (finish && currentField) {
+      // The spring's settle time is an approximation. Complete the layout
+      // before sleeping so slow/long-distance morphs cannot freeze short.
+      // GPU CPU snapshots are stale, so this must be a full-state upload.
+      snapField(currentField)
+      backend.uploadField(currentField, true)
+    }
+    // Always present the running frame, including the exact final state.
     backend.draw()
-    // With jitter active and content present, the field never converges (by
-    // design), so the settled() early-sleep only applies when jitter === 0
-    // or the field is empty (nothing to shimmer either way).
-    if (
-      !(continuous && hasContent) &&
-      (now >= awakeUntil || backend.settled?.())
-    ) {
+    if (finish) {
+      needsFrame = false
       stop()
       return
     }
@@ -73,7 +81,7 @@ export function createEngine(opts: EngineOptions): Engine {
   }
 
   const start = (): void => {
-    if (running) return
+    if (running || disposed) return
     running = true
     last = performance.now()
     accumulator = 0
@@ -87,7 +95,8 @@ export function createEngine(opts: EngineOptions): Engine {
   }
 
   const wake = (): void => {
-    awakeUntil = performance.now() + settleSeconds * 1000
+    remaining = settleSeconds
+    needsFrame = true
     if (!running && visible) start()
   }
 
@@ -96,10 +105,8 @@ export function createEngine(opts: EngineOptions): Engine {
       ? new IntersectionObserver((entries) => {
           visible = entries[0]?.isIntersecting ?? true
           if (visible) {
-            // Continuous (jitter > 0 with content present) must run whenever
-            // on-screen; otherwise only resume if still inside the wake window.
-            if ((continuous && hasContent) || performance.now() < awakeUntil)
-              start()
+            // Paused time does not advance physics or consume the settle budget.
+            if ((continuous && hasContent) || needsFrame) start()
           } else {
             stop()
           }
@@ -120,13 +127,18 @@ export function createEngine(opts: EngineOptions): Engine {
       // before the loop stops itself). A field that just became non-empty
       // must be eligible for the continuous path immediately (wake() below
       // starts the loop if so).
+      currentField = field
       hasContent = field.active > 0
       backend.uploadField(field, full)
       wake()
     },
     setParams(next): void {
       backend.setParams(next)
-      settleSeconds = computeSettleDuration(next.settleTime, next.opacityRate)
+      settleSeconds = computeSettleDuration(
+        next.settleTime,
+        next.opacityRate,
+        next.colorRate,
+      )
       continuous = next.jitter > 0
       if (continuous && hasContent) {
         if (visible && !running) start()
@@ -141,6 +153,8 @@ export function createEngine(opts: EngineOptions): Engine {
       wake()
     },
     dispose(): void {
+      disposed = true
+      currentField = null
       stop()
       io?.disconnect()
       backend.dispose()

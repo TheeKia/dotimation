@@ -1,10 +1,11 @@
 import { FIXED_DT, MAX_STEPS_PER_FRAME } from '@/engine/clock'
+import { snapField } from '@/engine/field'
 import type { SimParams } from '@/engine/params'
 import { planReconcile } from '@/engine/reconcile-plan'
 import type { Backend, ParticleField } from '@/types'
 import {
   ensureScratch,
-  fadeDurationMs,
+  FADE_COMPLETE,
   packStateInto,
   packTargetsInto,
   STATE_FLOATS,
@@ -29,7 +30,7 @@ export function createWebGPUBackend(initial: SimParams): Backend {
   let count = 0
   let active = 0
   let lost = false
-  let lastUpload = 0
+  let fadeProgress = 0
   let p = initial
   let stateScratch = new Float32Array(1024 * STATE_FLOATS)
   let targetScratch = new Float32Array(1024 * TARGET_FLOATS)
@@ -53,13 +54,40 @@ export function createWebGPUBackend(initial: SimParams): Backend {
   let pendingSteps = 0
   let stepDt = FIXED_DT
 
-  async function setup(canvas: HTMLCanvasElement): Promise<void> {
-    const s = await acquireGPU(canvas)
+  function releaseResources(): void {
+    // Detach the device first so its loss notification cannot start recovery.
+    const previous = device
+    device = null
+    if (buffers) disposeBuffers(buffers)
+    pipelines?.simUniform.destroy()
+    pipelines?.renderUniform.destroy()
+    previous?.destroy()
+    context = null
+    pipelines = null
+    buffers = null
+    simBindGroups = null
+    renderBind = null
+  }
+
+  async function setup(
+    canvas: HTMLCanvasElement,
+    signal?: AbortSignal,
+  ): Promise<void> {
+    const s = await acquireGPU(canvas, () => disposed || !!signal?.aborted)
     device = s.device
     context = s.context
-    pipelines = createPipelines(device, s.format)
-    buffers = createBuffers(device, 1024)
-    rebuildBindGroups()
+    // WebGPU validation errors are asynchronous; without a scope an invalid
+    // pipeline looks initialized and prevents the fallback tier from running.
+    device.pushErrorScope('validation')
+    let validationError: GPUError | null = null
+    try {
+      pipelines = createPipelines(device, s.format)
+      buffers = createBuffers(device, 1024)
+      rebuildBindGroups()
+    } finally {
+      validationError = await s.device.popErrorScope()
+    }
+    if (validationError) throw new Error(`webgpu: ${validationError.message}`)
     watchLoss(s.device)
   }
 
@@ -77,6 +105,7 @@ export function createWebGPUBackend(initial: SimParams): Backend {
   async function recover(): Promise<void> {
     if (!canvasEl || disposed) return
     try {
+      releaseResources()
       active = 0
       count = 0
       pendingSteps = 0
@@ -86,11 +115,14 @@ export function createWebGPUBackend(initial: SimParams): Backend {
       // Re-seed from the last field and paint once, so the canvas isn't blank
       // until the engine happens to wake.
       if (lastField) {
-        api.uploadField(lastField)
+        snapField(lastField)
+        api.uploadField(lastField, true)
         api.draw()
       }
     } catch {
-      // A second failure means the GPU is really gone; stay lost.
+      // A failed replacement setup may already own a new device and buffers.
+      releaseResources()
+      lost = true
     }
   }
 
@@ -129,12 +161,12 @@ export function createWebGPUBackend(initial: SimParams): Backend {
   }
 
   const api: Backend = {
-    async init(canvas, devicePixelRatio): Promise<void> {
+    async init(canvas, devicePixelRatio, signal): Promise<void> {
       canvasEl = canvas
       dpr = devicePixelRatio
       devW = canvas.width
       devH = canvas.height
-      await setup(canvas)
+      await setup(canvas, signal)
     },
     uploadField(field: ParticleField, full = false): void {
       lastField = field
@@ -160,7 +192,7 @@ export function createWebGPUBackend(initial: SimParams): Backend {
         )
         active = field.active
         count = field.count
-        lastUpload = performance.now()
+        fadeProgress = 0
         return
       }
 
@@ -180,7 +212,7 @@ export function createWebGPUBackend(initial: SimParams): Backend {
 
       active = plan.active
       count = plan.count
-      lastUpload = performance.now()
+      fadeProgress = 0
     },
     setParams(next: SimParams): void {
       p = next
@@ -189,10 +221,8 @@ export function createWebGPUBackend(initial: SimParams): Backend {
     step(dt: number): void {
       if (!device || !buffers || !pipelines || !simBindGroups || lost) return
       if (count <= 0) return
-      if (
-        count > active &&
-        performance.now() - lastUpload > fadeDurationMs(p.opacityRate)
-      ) {
+      fadeProgress += dt * p.opacityRate
+      if (count > active && fadeProgress >= FADE_COMPLETE) {
         count = active
       }
       // Record intent only — the GPU work is flushed once in draw() so the whole
@@ -207,7 +237,9 @@ export function createWebGPUBackend(initial: SimParams): Backend {
         !buffers ||
         !pipelines ||
         !renderBind ||
-        lost
+        lost ||
+        devW <= 0 ||
+        devH <= 0
       ) {
         pendingSteps = 0
         return
@@ -292,18 +324,7 @@ export function createWebGPUBackend(initial: SimParams): Backend {
     },
     dispose(): void {
       disposed = true
-      if (buffers) disposeBuffers(buffers)
-      pipelines?.simUniform.destroy()
-      pipelines?.renderUniform.destroy()
-      // Frees the GPU device deterministically (GC is not prompt about it);
-      // triggers device.lost with reason 'destroyed', which watchLoss ignores.
-      device?.destroy()
-      device = null
-      context = null
-      pipelines = null
-      buffers = null
-      simBindGroups = null
-      renderBind = null
+      releaseResources()
       canvasEl = null
       lastField = null
     },

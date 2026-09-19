@@ -14,15 +14,8 @@ export const STATE_STRIDE_BYTES: number = STATE_FLOATS * 4
 /** Unit quad as a triangle strip (4 corners in [0,1]). */
 export const QUAD: Float32Array = new Float32Array([0, 0, 1, 0, 0, 1, 1, 1])
 
-/**
- * Faders fade out at the live opacity rate; after this long they are invisible
- * and the tail can be dropped. The Canvas2D backend compacts faders in
- * stepField; the GPU sims don't change count, so the backends expire them by
- * elapsed time, computed from the current rate.
- */
-export function fadeDurationMs(opacityRate: number): number {
-  return (1 / opacityRate + 0.15) * 1000
-}
+/** Normalized opacity loss required before dropping faders; margin covers f32 rounding. */
+export const FADE_COMPLETE = 1.01
 
 /** Writes interleaved state [x,y,vx,vy,r,g,b,alpha] for slots [start,end) into `out`; returns the used view. */
 export function packStateInto(

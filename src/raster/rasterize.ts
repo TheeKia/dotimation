@@ -22,7 +22,7 @@ function loadImage(src: string): Promise<HTMLImageElement> {
     return image
   })()
   // Drop failed loads so a later render can retry them.
-  loading.catch(() => imageCache.delete(src))
+  loading.catch(() => imageCache.delete(src, loading))
   imageCache.set(src, loading)
   return loading
 }

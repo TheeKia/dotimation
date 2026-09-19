@@ -115,7 +115,7 @@ There is no `idle` prop — the rAF loop's lifetime is derived from `motion.jitt
 
 ### Accessibility
 
-The canvas renders with `role="img"`. Text items get an accessible name from their content automatically; pass `ariaLabel` for image items (or to override). The component honors `prefers-reduced-motion` out of the box: morphs complete instantly and the idle shimmer is disabled, so content changes become short opacity fades with no movement. Use the `reducedMotion` prop to wire it to your app's own motion setting instead.
+The canvas renders with `role="img"`. Text items get an accessible name from their content automatically; pass `ariaLabel` for image items (or to override). The component honors `prefers-reduced-motion` out of the box: morphs complete instantly and the idle shimmer is disabled, so content changes appear immediately with no movement or fade. Use the `reducedMotion` prop to wire it to your app's own motion setting instead.
 
 ### Web fonts
 

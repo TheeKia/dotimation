@@ -90,7 +90,7 @@ function num(v: number | undefined, fallback: number): number {
 /**
  * 'hairline' resolves to the internal 0 sentinel: every tier derives its dot
  * footprint as max(1, round(dotSize * dpr)) (the cross-tier parity contract —
- * see CLAUDE.md), so 0 floors to exactly one device pixel at any DPR and any
+ * see AGENTS.md), so 0 floors to exactly one device pixel at any DPR and any
  * maxDpr. Numeric size <= 0 still falls back to the default, which keeps the
  * sentinel unreachable except through the explicit string.
  */

@@ -14,7 +14,7 @@ const index = Bun.file('dist/index.js')
 if (!(await index.exists()))
   fail('dist/index.js is missing — run `bun run build`')
 
-// The sideEffects/tree-shaking footgun (see CLAUDE.md) emits a ~44-byte shell.
+// The sideEffects/tree-shaking footgun (see AGENTS.md) emits a ~44-byte shell.
 const indexSource = await index.text()
 if (indexSource.length < 1000)
   fail(`dist/index.js is ${indexSource.length} bytes — bundle is gutted`)

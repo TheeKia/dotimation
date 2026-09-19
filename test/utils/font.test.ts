@@ -48,3 +48,15 @@ describe('getMonospaceFontSize', () => {
     )
   })
 })
+
+test('blank lines do not shrink the auto font width to the minimum', () => {
+  expect(getAutoFontSize(300, 'Hello\n')).toBe(getAutoFontSize(300, 'Hello'))
+  expect(getAutoFontSize(300, 'Hello\n\nWorld')).toBe(
+    getAutoFontSize(300, 'Hello\nWorld'),
+  )
+})
+
+test('monospace sizing handles non-finite widths', () => {
+  expect(getMonospaceFontSize(NaN, 'hello')).toBe(10)
+  expect(getMonospaceFontSize(Infinity, 'hello')).toBe(10)
+})

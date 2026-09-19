@@ -33,3 +33,12 @@ describe('getDpr', () => {
     expect(getDpr(1)).toBe(1)
   })
 })
+
+test('invalid density caps and device ratios use safe defaults', () => {
+  g.window = { devicePixelRatio: 3 }
+  for (const cap of [0, -1, NaN, Infinity]) expect(getDpr(cap)).toBe(2)
+  for (const ratio of [0, -1, NaN, Infinity]) {
+    g.window = { devicePixelRatio: ratio }
+    expect(getDpr()).toBe(1)
+  }
+})

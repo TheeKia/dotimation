@@ -3,8 +3,7 @@ function getFontSize(width: number, text: string): number {
   const MAX = 300
   const MIN = 10
 
-  if (!text || width <= 0) return MIN
-  if (!Number.isFinite(width)) return MIN
+  if (!text || !Number.isFinite(width) || width <= 0) return MIN
 
   // Average per-glyph "em" costs (relative to 1em width).
   const WEIGHTS = {
@@ -102,7 +101,8 @@ function isCJK(cp: number): boolean {
 }
 
 export function getAutoFontSize(width: number, text: string): number {
-  const lines = text.split('\n')
+  const lines = text.split('\n').filter((line) => line.trim().length > 0)
+  if (lines.length === 0) return 10
   return lines.reduce((acc, line) => {
     const size = getFontSize(width, line)
     return size < acc ? size : acc
@@ -113,7 +113,7 @@ export function getMonospaceFontSize(width: number, text: string): number {
   const MAX = 300
   const MIN = 10
 
-  if (!text || width <= 0) return MIN
+  if (!text || !Number.isFinite(width) || width <= 0) return MIN
 
   const glyphCount = text
     .split('\n')

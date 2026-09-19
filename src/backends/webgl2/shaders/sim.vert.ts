@@ -22,13 +22,13 @@ out vec2 vVel;
 out vec3 vColor;
 out float vAlpha;
 
-// PCG output hash on u32 — uniform in [0, 1) (2^32 > max state, 1.0 is
-// unreachable, matching the CPU PRNG's toUnit contract), unlike
+// PCG output hash, truncated to 24 bits before conversion to f32 so rounding
+// cannot produce 1.0. This preserves the CPU PRNG's [0, 1) contract, unlike
 // fract(sin(x)*K) which bands at large x on some GPUs.
 float hash01(uint v) {
   uint state = v * 747796405u + 2891336453u;
   uint word = ((state >> ((state >> 28u) + 4u)) ^ state) * 277803737u;
-  return float((word >> 22u) ^ word) / 4294967296.0;
+  return float(((word >> 22u) ^ word) >> 8u) / 16777216.0;
 }
 
 void main() {
