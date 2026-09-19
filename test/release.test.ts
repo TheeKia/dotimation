@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { publishReleaseNotes } from '../scripts/github-release'
 import { parseReleaseArgs, release } from '../scripts/release'
+import { generateReleaseNotes, notesBase } from '../scripts/release-notes'
 import { releaseChannel, releaseMetadata } from '../scripts/release-version'
 
 const temporary: string[] = []
@@ -280,4 +281,72 @@ test('GitHub creates a missing release and fails on lookup errors', async () => 
     }),
   ).rejects.toThrow('lookup failed')
   expect(calls).toBe(1)
+})
+
+test('automatic notes exclude old/release commits and preserve scopes and PR references', async () => {
+  const { root } = await fixture()
+  const git = (...args: string[]) => run(root, ['git', ...args])
+  await git('tag', 'v0.1.0')
+  await git(
+    'commit',
+    '--allow-empty',
+    '-m',
+    'feat(react): add transitions (#12)',
+  )
+  await git('commit', '--allow-empty', '-m', 'fix(svelte): update bindings')
+  await git('commit', '--allow-empty', '-m', 'chore(release): v0.2.0-beta.1')
+  await git(
+    'commit',
+    '--allow-empty',
+    '-m',
+    'feat(core)!: change defaults',
+    '-m',
+    'BREAKING CHANGE: Set motion explicitly to preserve old behavior.',
+  )
+  const notes = await generateReleaseNotes(git, '0.2.0')
+  expect(notes).toContain('Changes since v0.1.0')
+  expect(notes).toContain('## Features')
+  expect(notes).toContain('react: add transitions (#12)')
+  expect(notes).toContain('## Fixes')
+  expect(notes).toContain('svelte: update bindings')
+  expect(notes).toContain('## Breaking changes')
+  expect(notes).toContain('Set motion explicitly')
+  expect(notes).not.toContain('chore(release)')
+  expect(notes).not.toContain('- initial')
+})
+
+test('stable notes cover prereleases while prerelease notes are incremental', () => {
+  const tags = [
+    'v0.1.0',
+    'v0.2.0-beta.1',
+    'v0.2.0-beta.2',
+    'v0.3.0',
+    'other',
+    'vgarbage',
+  ]
+  expect(notesBase(tags, '0.2.0')).toBe('v0.1.0')
+  expect(notesBase(tags, '0.2.0-beta.3')).toBe('v0.2.0-beta.2')
+  expect(notesBase([], '0.1.0')).toBeUndefined()
+})
+
+test('release generates a notes snapshot with no handwritten file; dry run creates nothing', async () => {
+  const { root } = await fixture()
+  const path = join(root, 'docs/releases/0.2.0.md')
+  await release(root, { version: '0.2.0', dryRun: true })
+  expect(await Bun.file(path).exists()).toBe(false)
+  expect(await run(root, ['git', 'status', '--porcelain'])).toBe('')
+  await release(root, { version: '0.2.0', dryRun: false }, async () => {})
+  expect(await Bun.file(path).text()).toContain('Initial release history.')
+  expect((await releaseMetadata(root, 'v0.2.0')).notes).toContain('- initial')
+})
+
+test('missing remote tags fail with actionable instructions rather than incomplete notes', async () => {
+  const { root } = await fixture()
+  const git = (...args: string[]) => run(root, ['git', ...args])
+  await git('tag', 'v0.1.0')
+  await git('push', 'origin', 'v0.1.0')
+  await git('tag', '-d', 'v0.1.0')
+  await expect(generateReleaseNotes(git, '0.2.0')).rejects.toThrow(
+    'git fetch origin --tags',
+  )
 })

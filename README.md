@@ -190,5 +190,6 @@ MIT
 
 Core, React and Svelte ship together at one version. Maintainers can preview with
 `bun run release <version> --dry-run`, then run `bun run release <version>`.
-See the [release guide](docs/releases/README.md) for reviewed release notes,
+Notes are generated automatically; use `--notes <file>` for custom notes.
+See the [release guide](docs/releases/README.md) for release notes,
 prereleases, validation, and recovery. Publishing runs only in GitHub Actions.

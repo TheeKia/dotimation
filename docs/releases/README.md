@@ -1,6 +1,6 @@
 # Release notes
 
-Before releasing, write and commit `docs/releases/<version>.md`. Then run:
+Release notes are generated automatically. Run:
 
 ```sh
 bun run release 0.8.0 --dry-run
@@ -10,8 +10,29 @@ bun run release 0.8.0
 Use the version you intend to ship; these commands are examples. All three
 packages receive that version. The private root package version is unchanged.
 
-Describe user-facing changes, migration steps and affected adapters. A suggested
-structure (omit sections that do not apply):
+By default, notes list commits since the previous reachable release tag, grouped
+by conventional commit type (features, fixes, performance, documentation,
+maintenance and other changes). Commit scopes such as `react` or `svelte` and
+PR references such as `(#123)` are preserved. Release commits and merge wrappers
+are excluded; individual merged commits and squash titles remain. Breaking-change
+markers (`!` or `BREAKING CHANGE:`) get their own section.
+
+Stable releases compare against the previous stable tag, including changes from
+the entire prerelease cycle. Prereleases compare against the previous release,
+including earlier prereleases. With no previous tag, notes use the full history.
+Automatic notes require full history and local release tags; follow the error's
+`git fetch` instructions if the clone is shallow or tags are missing.
+
+Dry runs preview generated notes without writing them. Actual releases save the
+snapshot to `docs/releases/<version>.md` in the release commit; CI publishes that
+exact text. No GitHub API token or PR lookup is needed to generate notes.
+
+For custom notes, pass `--notes /absolute/path/to/notes.md`, or write and commit
+`docs/releases/<version>.md` beforehand. Existing notes are respected instead of
+regenerated. An explicit `--notes` file must exist and contain text; errors do not
+silently fall back to generated notes. Describe migration steps manually for
+breaking changes—the generator summarizes commit titles, not the code's behavior.
+A suggested structure for custom notes (omit sections that do not apply):
 
 ```markdown
 ## Core
@@ -27,10 +48,9 @@ structure (omit sections that do not apply):
 - Explain breaking changes and required user actions.
 ```
 
-Alternatively, pass `--notes /absolute/path/to/notes.md` to import an external file
-into the release commit. A notes file inside the repository must be committed
-first because the command requires a clean working tree. Notes are required for
-both dry runs and releases; the script cannot infer user-facing changes.
+A custom notes file inside the repository must be committed first because the
+command requires a clean working tree. External notes are imported into the release
+commit. No handwritten file is required for the default workflow.
 
 Prereleases such as `0.9.0-beta.1` use npm's `next` tag and GitHub's prerelease flag.
 Stable releases use `latest`. Versions must increase, with no `v` prefix or build

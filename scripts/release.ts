@@ -1,5 +1,6 @@
 import { mkdir, rm } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
+import { generateReleaseNotes } from './release-notes'
 import {
   packageDirectories,
   releaseChannel,
@@ -114,7 +115,12 @@ export async function release(
     throw new Error(`${version} must be newer than ${current}`)
   const notesPath = `docs/releases/${version}.md`
   const sourceNotes = resolve(root, options.notes ?? notesPath)
-  const notes = validateNotes(await Bun.file(sourceNotes).text())
+  const notesFile = Bun.file(sourceNotes)
+  const notes = validateNotes(
+    options.notes || (await notesFile.exists())
+      ? await notesFile.text()
+      : await generateReleaseNotes(git, version),
+  )
   if (
     sourceNotes !== resolve(root, notesPath) &&
     (await Bun.file(resolve(root, notesPath)).exists())
@@ -229,7 +235,7 @@ export async function release(
 if (import.meta.main) {
   if (process.argv.includes('--help')) {
     console.log(
-      'Usage: bun run release <version> [--dry-run] [--notes <file.md>]\nDefault notes: docs/releases/<version>.md (commit notes before releasing).\nRequires a clean main matching origin/main. Builds/tests locally, then pushes commit + tag atomically.',
+      'Usage: bun run release <version> [--dry-run] [--notes <file.md>]\nNotes are generated from commits by default and saved to docs/releases/<version>.md. Use --notes to override.\nRequires a clean main matching origin/main. Builds/tests locally, then pushes commit + tag atomically.',
     )
   } else {
     try {
