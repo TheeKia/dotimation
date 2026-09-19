@@ -71,7 +71,8 @@ jobs:
 
       - name: Verify browser behavior and GPU parity
         if: runner.os == 'Linux'
-        run: bun run test:e2e
+        # Headless Chromium still needs a display for WebGPU compositing.
+        run: xvfb-run --auto-servernum bun run test:e2e
 
       - name: Pack packages
         if: runner.os == 'Linux'

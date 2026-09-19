@@ -848,6 +848,16 @@ try {
       '--enable-unsafe-swiftshader',
       '--enable-unsafe-webgpu',
       `--use-angle=${process.env.DOTIMATION_E2E_ANGLE ?? 'swiftshader'}`,
+      // Linux canvas presentation needs Vulkan compositing and a display
+      // (xvfb-run in CI), otherwise acquiring the texture can lose the device.
+      ...(process.platform === 'linux'
+        ? [
+            '--enable-gpu',
+            '--ignore-gpu-blocklist',
+            '--enable-features=Vulkan',
+            '--use-vulkan=swiftshader',
+          ]
+        : []),
     ],
   })
   try {
