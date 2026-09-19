@@ -1,4 +1,5 @@
 import { resolve } from 'node:path'
+import { releaseMetadata } from './release-version'
 
 const registry = 'https://registry.npmjs.org'
 
@@ -28,6 +29,7 @@ export async function publishIfMissing(
 
 if (import.meta.main) {
   const root = resolve(import.meta.dirname, '..')
+  const { channel } = await releaseMetadata(root, process.env.GITHUB_REF_NAME)
   const packages = await Promise.all(
     ['core', 'react', 'svelte'].map(async (directory) => {
       const { name, version } = await Bun.file(
@@ -50,6 +52,8 @@ if (import.meta.main) {
           '--access',
           'public',
           '--ignore-scripts',
+          '--tag',
+          channel,
           '--registry',
           registry,
         ],

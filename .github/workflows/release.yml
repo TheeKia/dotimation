@@ -58,6 +58,6 @@ jobs:
         run: bun scripts/publish-packages.ts
 
       - name: Generate GitHub release notes
-        run: bunx changelogithub@15.0.5
+        run: bun scripts/github-release.ts
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

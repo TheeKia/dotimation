@@ -185,3 +185,10 @@ Please see [CONTRIBUTING.md](./CONTRIBUTING.md) for contribution guidelines.
 ## License
 
 MIT
+
+## Releasing
+
+Core, React and Svelte ship together at one version. Maintainers can preview with
+`bun run release <version> --dry-run`, then run `bun run release <version>`.
+See the [release guide](docs/releases/README.md) for reviewed release notes,
+prereleases, validation, and recovery. Publishing runs only in GitHub Actions.
