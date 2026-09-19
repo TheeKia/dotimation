@@ -45,12 +45,13 @@ jobs:
         if: runner.os == 'Linux'
         run: bun run lint
 
+      - name: Build packages
+        run: bun run build
+
+      # Public API fixtures resolve the Svelte package's generated declarations.
       - name: Type check
         if: runner.os == 'Linux'
         run: bun run type-check
-
-      - name: Build packages
-        run: bun run build
 
       - name: Validate distribution
         run: bun run check:dist
