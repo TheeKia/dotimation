@@ -1,6 +1,6 @@
 'use client'
 
-import { createDotimationController } from '@dotimation/core'
+import { createDotimationController } from '@kiaa/dotimation-core'
 import { useImperativeHandle, useRef, useState } from 'react'
 import { useIsomorphicLayoutEffect } from './isomorphic-layout-effect'
 import type { DotimationProps } from './types'

@@ -1,4 +1,4 @@
-import type { DotimationStats } from 'dotimation'
+import type { DotimationStats } from '@kiaa/dotimation-react'
 import { useFps } from '../hooks/use-fps'
 
 export function StatsBar({

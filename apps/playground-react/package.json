@@ -14,7 +14,7 @@
     "clsx": "^2.1.1",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
-    "dotimation": "workspace:*"
+    "@kiaa/dotimation-react": "workspace:*"
   },
   "devDependencies": {
     "@babel/core": "^7.29.0",

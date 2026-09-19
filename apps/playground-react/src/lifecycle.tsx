@@ -1,4 +1,4 @@
-import { Dotimation } from 'dotimation'
+import { Dotimation } from '@kiaa/dotimation-react'
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { gpuChecks } from '../../../test/fixtures/browser/gpu'

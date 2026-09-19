@@ -2,7 +2,7 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "isolatedDeclarations": false,
-    "paths": { "@dotimation/core": ["../core/src/index.ts"] }
+    "paths": { "@kiaa/dotimation-core": ["../core/src/index.ts"] }
   },
   "include": [
     "src/**/*.ts",

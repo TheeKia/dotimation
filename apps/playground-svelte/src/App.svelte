@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Dotimation, type DotimationStats } from '@dotimation/svelte'
+  import { Dotimation, type DotimationStats } from '@kiaa/dotimation-svelte'
   import ContentControls from './components/ContentControls.svelte'
   import SimulationControls from './components/SimulationControls.svelte'
   import NumberField from './components/NumberField.svelte'

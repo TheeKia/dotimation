@@ -1,4 +1,4 @@
-import type { DotimationOptions } from '@dotimation/core'
+import type { DotimationOptions } from '@kiaa/dotimation-core'
 import type { ClassValue } from 'svelte/elements'
 
 export type DotimationProps = DotimationOptions & {

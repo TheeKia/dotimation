@@ -1,8 +1,8 @@
-# @dotimation/core
+# @kiaa/dotimation-core
 
 Framework-independent animation engine and browser runtime for [dotimation](https://github.com/TheeKia/dotimation).
 
-React users install `dotimation`; Svelte users install `@dotimation/svelte`. Both adapters share this package automatically. It includes Canvas2D, WebGL2 and WebGPU backends plus an inlined rasterization worker.
+React users install `@kiaa/dotimation-react`; Svelte users install `@kiaa/dotimation-svelte`. Both adapters share this package automatically. It includes Canvas2D, WebGL2 and WebGPU backends plus an inlined rasterization worker.
 
 ## Adapter integration
 

@@ -3,9 +3,9 @@
 The workspace contains three independently packaged libraries with a single implementation of animation behavior:
 
 ```text
-dotimation (React) ────────┐
-                          ├── @dotimation/core
-@dotimation/svelte ────────┘
+@kiaa/dotimation-react ────┐
+                          ├── @kiaa/dotimation-core
+@kiaa/dotimation-svelte ───┘
 ```
 
 Core contains both pure algorithms and browser-bound code. Framework independence means no React/Svelte imports, not the absence of DOM APIs. Pure simulation, reconciliation, sampling and scheduling remain directly unit-testable; browser behavior is exercised through both adapters.
@@ -30,7 +30,7 @@ Svelte snapshots nested prop values inside a tracked effect before calling the r
 
 Both adapters share content, dot/motion options, sizing, backend selection, matching, reduced motion and stats. React exposes `className`, a CSSProperties object and `ref`. Svelte exposes `class`, a CSS string and `bind:canvas`. Fixed dimensions and `fill` remain a discriminated union in both generated public APIs.
 
-React retains its existing `dotimation` import and previously exported implementation types. Core explicitly exports those compatibility types, but internal constructors and file paths are not package entry points. New framework adapters should use the controller rather than import internals.
+React is published as `@kiaa/dotimation-react`, replacing the former `dotimation` import. Previously exported implementation types remain available. Core explicitly exports those compatibility types, but internal constructors and file paths are not package entry points. New framework adapters should use the controller rather than import internals.
 
 Imports and controller construction are SSR-safe. Effects/attachments acquire browser resources only after mounting. Both adapters emit a canvas with CSS dimensions and accessibility attributes on the server, so hydration has a stable DOM shape and reserved space.
 
@@ -52,7 +52,7 @@ The root is private; published packages live under `packages/`. Keep the three p
 4. The tag triggers the shared CI validation. The publishing job sends the exact verified tarballs to npm in core → React → Svelte order, then creates or updates GitHub release notes from the Markdown snapshot saved in the release commit. Prerelease versions publish to npm `next` and are marked as GitHub prereleases; stable versions use `latest`.
 
 See [release instructions](releases/README.md) for examples, prerequisites and recovery. Failed validation restores the release's input edits; a failed push retains the local commit/tag for retry. A failed CI publication can be rerun: existing package versions are skipped, registry errors fail the job, and GitHub notes update idempotently. No token-based fallback is used.
-The new scoped package names require access to the `@dotimation` registry scope before the first release. This refactor does not publish packages or change the existing release version. Every package's prepublish hook rebuilds and validates output for manual publication. CI uses `bun run pack:packages` after building, then `DOTIMATION_PACKAGE_DIR=release-packages bun run test:packages` to test those archives. Publishing the verified tarballs skips rebuild hooks. Without `DOTIMATION_PACKAGE_DIR`, consumer tests still pack their own temporary archives.
+All three packages use the npm account’s personal `@kiaa` scope; no organization is required. Each new package needs one authenticated initial publication before its Trusted Publisher can be configured. Every package's prepublish hook rebuilds and validates output for manual publication. CI uses `bun run pack:packages` after building, then `DOTIMATION_PACKAGE_DIR=release-packages bun run test:packages` to test those archives. Publishing the verified tarballs skips rebuild hooks. Without `DOTIMATION_PACKAGE_DIR`, consumer tests still pack their own temporary archives.
 
 Bun is pinned in `.bun-version`. CI runs on pull requests and pushes to `main`; tags run only the release workflow. A single Linux validation job runs builds, distribution checks, unit tests, lint, types, playground builds, browser checks and packed-consumer tests. Linux GPU tests use `xvfb-run --auto-servernum bun run test:e2e` with Vulkan/SwiftShader compositing enabled: headless Chromium still needs a display for WebGPU canvas presentation. Playwright's `install --with-deps chromium` installs Xvfb. Browser failures retain screenshots and Playwright traces for seven days. Release runs are serialized without cancellation, and release-note failures fail the publishing job so they can be retried.
 

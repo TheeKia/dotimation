@@ -2,7 +2,7 @@ import type {
   AnimateItem,
   BackendKind,
   DotimationProps,
-} from '@dotimation/svelte'
+} from '@kiaa/dotimation-svelte'
 
 export interface TextContent {
   type: 'text'
@@ -226,5 +226,5 @@ export function snippet(config: Config): string {
     '<',
     '\\u003c',
   )
-  return `<script lang="ts">\n  import { Dotimation } from '@dotimation/svelte'\n  import type { DotimationProps } from '@dotimation/svelte'\n\n  const options: DotimationProps = ${options}\n</script>\n\n<Dotimation {...options} />${config.sizing === 'fill' ? '\n<!-- Place inside a container with a defined height. -->' : ''}`
+  return `<script lang="ts">\n  import { Dotimation } from '@kiaa/dotimation-svelte'\n  import type { DotimationProps } from '@kiaa/dotimation-svelte'\n\n  const options: DotimationProps = ${options}\n</script>\n\n<Dotimation {...options} />${config.sizing === 'fill' ? '\n<!-- Place inside a container with a defined height. -->' : ''}`
 }

@@ -1,6 +1,6 @@
 import './index.css'
 
-import type { DotimationStats } from 'dotimation'
+import type { DotimationStats } from '@kiaa/dotimation-react'
 import { useEffect, useState } from 'react'
 import { Inspector } from './components/inspector/inspector'
 import { Stage } from './components/stage/stage'

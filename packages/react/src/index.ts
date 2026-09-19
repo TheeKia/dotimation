@@ -10,6 +10,6 @@ export type {
   MotionOptions,
   ParticleField,
   SimParams,
-} from '@dotimation/core'
+} from '@kiaa/dotimation-core'
 export { Dotimation } from './Dotimation'
 export type { DotimationProps } from './types'

@@ -5,7 +5,7 @@ import type {
   FieldTargets,
   ParticleField,
   SimParams,
-} from 'dotimation'
+} from '@kiaa/dotimation-react'
 import type { ComponentProps } from 'react'
 
 const props: DotimationProps = {

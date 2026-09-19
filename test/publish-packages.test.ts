@@ -4,14 +4,16 @@ import { publishIfMissing } from '../scripts/publish-packages'
 test('a partial release skips an existing version', async () => {
   let published = false
   await publishIfMissing(
-    '@dotimation/core',
+    '@kiaa/dotimation-core',
     '1.0.0',
     async () => {
       published = true
     },
     async (url) => {
-      expect(url).toBe('https://registry.npmjs.org/%40dotimation%2Fcore/1.0.0')
-      return Response.json({ name: '@dotimation/core', version: '1.0.0' })
+      expect(url).toBe(
+        'https://registry.npmjs.org/%40kiaa%2Fdotimation-core/1.0.0',
+      )
+      return Response.json({ name: '@kiaa/dotimation-core', version: '1.0.0' })
     },
   )
   expect(published).toBe(false)
@@ -20,7 +22,7 @@ test('a partial release skips an existing version', async () => {
 test('an absent version is published', async () => {
   let published = false
   await publishIfMissing(
-    'dotimation',
+    '@kiaa/dotimation-react',
     '1.0.0',
     async () => {
       published = true
@@ -35,7 +37,7 @@ test('registry errors never trigger publishing', async () => {
     let published = false
     await expect(
       publishIfMissing(
-        'dotimation',
+        '@kiaa/dotimation-react',
         '1.0.0',
         async () => {
           published = true
@@ -50,12 +52,13 @@ test('registry errors never trigger publishing', async () => {
 test('mismatched metadata cannot silently skip publishing', async () => {
   await expect(
     publishIfMissing(
-      'dotimation',
+      '@kiaa/dotimation-react',
       '1.0.0',
       async () => {
         throw new Error('Must not publish')
       },
-      async () => Response.json({ name: 'dotimation', version: '0.9.0' }),
+      async () =>
+        Response.json({ name: '@kiaa/dotimation-react', version: '0.9.0' }),
     ),
   ).rejects.toThrow('Unexpected registry metadata')
 })
@@ -63,7 +66,7 @@ test('mismatched metadata cannot silently skip publishing', async () => {
 test('publish failures propagate so later packages are not attempted', async () => {
   await expect(
     publishIfMissing(
-      'dotimation',
+      '@kiaa/dotimation-react',
       '1.0.0',
       async () => {
         throw new Error('OIDC authentication failed')

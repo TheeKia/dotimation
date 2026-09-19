@@ -23,8 +23,8 @@
     "noUncheckedSideEffectImports": true,
 
     "paths": {
-      "dotimation": ["../../packages/react/src/index.ts"],
-      "@dotimation/core": ["../../packages/core/src/index.ts"]
+      "@kiaa/dotimation-react": ["../../packages/react/src/index.ts"],
+      "@kiaa/dotimation-core": ["../../packages/core/src/index.ts"]
     }
   },
   "include": ["src"]

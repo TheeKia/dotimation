@@ -1,4 +1,4 @@
-import { Dotimation } from 'dotimation'
+import { Dotimation } from '@kiaa/dotimation-react'
 import { renderToString } from 'react-dom/server'
 
 export const html = renderToString(

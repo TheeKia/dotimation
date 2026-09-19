@@ -4,6 +4,6 @@ export type {
   DotimationStats,
   DotOptions,
   MotionOptions,
-} from '@dotimation/core'
+} from '@kiaa/dotimation-core'
 export { default as Dotimation } from './Dotimation.svelte'
 export type { DotimationProps } from './types'

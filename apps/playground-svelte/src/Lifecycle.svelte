@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Dotimation } from '@dotimation/svelte'
+  import { Dotimation } from '@kiaa/dotimation-svelte'
   import { gpuChecks } from '../../../test/fixtures/browser/gpu'
   import type { LifecycleProps } from '../../../test/fixtures/browser/lifecycle'
 

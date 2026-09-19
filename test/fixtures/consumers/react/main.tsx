@@ -1,4 +1,4 @@
-import { Dotimation } from 'dotimation'
+import { Dotimation } from '@kiaa/dotimation-react'
 import { type ReactNode, StrictMode } from 'react'
 import { createRoot, hydrateRoot } from 'react-dom/client'
 

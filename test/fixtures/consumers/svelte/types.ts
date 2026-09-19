@@ -1,4 +1,4 @@
-import type { Dotimation, DotimationProps } from '@dotimation/svelte'
+import type { Dotimation, DotimationProps } from '@kiaa/dotimation-svelte'
 import type { ComponentProps } from 'svelte'
 
 const props: DotimationProps = {

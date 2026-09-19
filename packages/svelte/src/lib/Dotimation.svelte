@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { createDotimationController } from '@dotimation/core'
+  import { createDotimationController } from '@kiaa/dotimation-core'
   import { untrack } from 'svelte'
   import type { DotimationProps } from './types'
 

@@ -2,7 +2,7 @@
   "extends": "./tsconfig.base.json",
   "compilerOptions": {
     "paths": {
-      "@dotimation/core": ["./packages/core/src/index.ts"]
+      "@kiaa/dotimation-core": ["./packages/core/src/index.ts"]
     },
     "jsx": "react-jsx"
   },

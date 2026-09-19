@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Dotimation } from '@dotimation/svelte'
+  import { Dotimation } from '@kiaa/dotimation-svelte'
   let text = $state('Packaged Svelte')
   let mounted = $state(true)
   if (typeof window !== 'undefined')

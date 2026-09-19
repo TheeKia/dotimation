@@ -1,4 +1,4 @@
-import type { BackendKind } from 'dotimation'
+import type { BackendKind } from '@kiaa/dotimation-react'
 import type { ConfigApi } from '../../config/use-config'
 import { Field } from '../controls/field'
 import { Segmented } from '../controls/segmented'

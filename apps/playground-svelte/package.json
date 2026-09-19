@@ -7,7 +7,7 @@
     "build": "svelte-check --tsconfig ./tsconfig.json && vite build"
   },
   "dependencies": {
-    "@dotimation/svelte": "workspace:*",
+    "@kiaa/dotimation-svelte": "workspace:*",
     "svelte": "^5.29.0"
   },
   "devDependencies": {

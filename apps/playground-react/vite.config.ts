@@ -13,10 +13,10 @@ export default defineConfig({
   ],
   resolve: {
     alias: {
-      '@dotimation/core': fileURLToPath(
+      '@kiaa/dotimation-core': fileURLToPath(
         new URL('../../packages/core/src/index.ts', import.meta.url),
       ),
-      dotimation: fileURLToPath(
+      '@kiaa/dotimation-react': fileURLToPath(
         new URL('../../packages/react/src/index.ts', import.meta.url),
       ),
     },

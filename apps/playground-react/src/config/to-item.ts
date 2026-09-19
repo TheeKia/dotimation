@@ -1,4 +1,4 @@
-import type { AnimateItem } from 'dotimation'
+import type { AnimateItem } from '@kiaa/dotimation-react'
 import type { ItemConfig } from './types'
 
 /** Map the playground's always-populated ItemConfig to the library's AnimateItem. */

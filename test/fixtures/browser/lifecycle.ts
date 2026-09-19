@@ -1,4 +1,4 @@
-import type { DotimationOptions, DotimationStats } from '@dotimation/core'
+import type { DotimationOptions, DotimationStats } from '@kiaa/dotimation-core'
 
 /** A common browser driver; each adapter maps presentation/ref props natively. */
 export type LifecycleProps = DotimationOptions & { className?: string }

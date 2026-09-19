@@ -1,6 +1,6 @@
+import type { DotimationStats } from '@kiaa/dotimation-react'
+import { Dotimation } from '@kiaa/dotimation-react'
 import clsx from 'clsx'
-import type { DotimationStats } from 'dotimation'
-import { Dotimation } from 'dotimation'
 import { toAnimateItem } from '../../config/to-item'
 import type { BgKind, StageSize } from '../../config/types'
 import type { ConfigApi } from '../../config/use-config'

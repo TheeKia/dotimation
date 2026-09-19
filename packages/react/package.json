@@ -1,5 +1,5 @@
 {
-  "name": "dotimation",
+  "name": "@kiaa/dotimation-react",
   "version": "0.8.0",
   "repository": {
     "type": "git",
@@ -38,7 +38,7 @@
   "type": "module",
   "types": "./dist/index.d.ts",
   "dependencies": {
-    "@dotimation/core": "workspace:*"
+    "@kiaa/dotimation-core": "workspace:*"
   },
   "scripts": {
     "build": "bunup src/index.ts --env.NODE_ENV='production' --minify --no-sourcemap --target browser --banner '\"use client\";' --footer '// built with love' --preferred-tsconfig ./tsconfig.build.json",

@@ -1,4 +1,4 @@
-import type { DotimationOptions } from '@dotimation/core'
+import type { DotimationOptions } from '@kiaa/dotimation-core'
 import type { CSSProperties, Ref } from 'react'
 
 export type DotimationProps = DotimationOptions & {

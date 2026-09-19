@@ -1,21 +1,23 @@
 # dotimation
 
-[![npm](https://img.shields.io/npm/v/dotimation)](https://www.npmjs.com/package/dotimation)
+[![npm](https://img.shields.io/npm/v/@kiaa/dotimation-react)](https://www.npmjs.com/package/@kiaa/dotimation-react)
 [![CI](https://github.com/TheeKia/dotimation/actions/workflows/ci.yml/badge.svg)](https://github.com/TheeKia/dotimation/actions/workflows/ci.yml)
 [![license](https://img.shields.io/npm/l/dotimation)](./LICENSE)
 
 Animate anything with dots, in React or Svelte. Both components share the same animation engine, worker rasterizer, and rendering backends.
 
+Migrating from `dotimation`? Install `@kiaa/dotimation-react` and update your import paths. The React component API is unchanged.
+
 ## Installation
 
 ```bash
-bun add dotimation
+bun add @kiaa/dotimation-react
 ```
 
 ## React usage
 
 ```tsx
-import { Dotimation } from 'dotimation'
+import { Dotimation } from '@kiaa/dotimation-react'
 
 function Component() {
   return (
@@ -40,15 +42,15 @@ Or let the component track its parent's size:
 
 ## Svelte usage
 
-The Svelte 5 adapter lives in `@dotimation/svelte` (new in this workspace; available from the registry after its first release).
+The Svelte 5 adapter lives in `@kiaa/dotimation-svelte` (new in this workspace; available from the registry after its first release).
 
 ```bash
-bun add @dotimation/svelte
+bun add @kiaa/dotimation-svelte
 ```
 
 ```svelte
 <script lang="ts">
-  import { Dotimation } from '@dotimation/svelte'
+  import { Dotimation } from '@kiaa/dotimation-svelte'
 
   let text = $state('Hello Svelte')
   let canvas = $state<HTMLCanvasElement>()
@@ -170,7 +172,7 @@ Text using a custom `fontFamily` that hasn't finished loading is rasterized with
 ## Repository layout
 
 - `packages/core`: framework-independent runtime and rendering engine.
-- `packages/react`: the existing `dotimation` React package.
+- `packages/react`: the `@kiaa/dotimation-react` React package.
 - `packages/svelte`: the Svelte component package.
 - `apps/`: source-linked playgrounds for each framework.
 

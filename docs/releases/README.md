@@ -76,4 +76,6 @@ After a successful push, follow the Release workflow in GitHub Actions. Its fail
 does not require a new tag: rerun failed jobs to finish a partial publication.
 Published package versions are skipped; registry errors are fatal. Release notes
 are created or updated from the versioned Markdown, so a notes-step retry is safe.
-Actual npm publishing happens only in CI through Trusted Publishing.
+Routine npm publishing happens in CI through Trusted Publishing. A newly named
+package needs one initial authenticated publication of its verified tarball before
+Trusted Publishing can be configured. All packages use the personal `@kiaa` scope.

@@ -25,8 +25,8 @@
       "dependencies": {
         "@fontsource-variable/geist-mono": "^5.2.7",
         "@fontsource-variable/nunito-sans": "^5.2.7",
+        "@kiaa/dotimation-react": "workspace:*",
         "clsx": "^2.1.1",
-        "dotimation": "workspace:*",
         "react": "^19.2.5",
         "react-dom": "^19.2.5",
       },
@@ -55,7 +55,7 @@
     "apps/playground-svelte": {
       "name": "dotimation-playground-svelte",
       "dependencies": {
-        "@dotimation/svelte": "workspace:*",
+        "@kiaa/dotimation-svelte": "workspace:*",
         "svelte": "^5.29.0",
       },
       "devDependencies": {
@@ -65,14 +65,14 @@
       },
     },
     "packages/core": {
-      "name": "@dotimation/core",
+      "name": "@kiaa/dotimation-core",
       "version": "0.8.0",
     },
     "packages/react": {
-      "name": "dotimation",
+      "name": "@kiaa/dotimation-react",
       "version": "0.8.0",
       "dependencies": {
-        "@dotimation/core": "workspace:*",
+        "@kiaa/dotimation-core": "workspace:*",
       },
       "peerDependencies": {
         "react": "^19.0.0",
@@ -84,10 +84,10 @@
       ],
     },
     "packages/svelte": {
-      "name": "@dotimation/svelte",
+      "name": "@kiaa/dotimation-svelte",
       "version": "0.8.0",
       "dependencies": {
-        "@dotimation/core": "workspace:*",
+        "@kiaa/dotimation-core": "workspace:*",
       },
       "devDependencies": {
         "@sveltejs/package": "^2.5.0",
@@ -157,10 +157,6 @@
 
     "@bunup/shared": ["@bunup/shared@0.16.31", "", { "peerDependencies": { "typescript": ">=4.5.0" }, "optionalPeers": ["typescript"] }, "sha512-h1dw669Uk68NCt1WvgqNfQoCcaK1RxLVAs3yQRCRaFxJiI9cqhU0EquVoGFM1g1BxzujGa7+bA9gt5JR0ZVLxA=="],
 
-    "@dotimation/core": ["@dotimation/core@workspace:packages/core"],
-
-    "@dotimation/svelte": ["@dotimation/svelte@workspace:packages/svelte"],
-
     "@emnapi/core": ["@emnapi/core@1.11.1", "", { "dependencies": { "@emnapi/wasi-threads": "1.2.2", "tslib": "^2.4.0" } }, "sha512-RSvbQmHzdKzNsLYa/wHrbc3KN4sYLKAdPZxqiM2HATqv/SBk2/ENSHpvXGaLOMcsAyz0poEGqkmmKYG3OWiJEQ=="],
 
     "@emnapi/runtime": ["@emnapi/runtime@1.11.1", "", { "dependencies": { "tslib": "^2.4.0" } }, "sha512-vgj7R3y3Wgx24IQaGPA/R6YFXLHVMOZ0uVEyIQPaWs+rd1AzfEMXlAC22FYwO1XkKR6NPsq7mUandH8oIRdZFw=="],
@@ -206,6 +202,12 @@
     "@jridgewell/sourcemap-codec": ["@jridgewell/sourcemap-codec@1.6.0", "", {}, "sha512-T7jf+5zgsZHwNJ4lvQ7/aezbyk0nNX+zJVWpmHA7VYsEx7a7qr5Rg5IbtJFqkgze5Y2sruq1RUY8Q837Od7iFw=="],
 
     "@jridgewell/trace-mapping": ["@jridgewell/trace-mapping@0.3.31", "", { "dependencies": { "@jridgewell/resolve-uri": "^3.1.0", "@jridgewell/sourcemap-codec": "^1.4.14" } }, "sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw=="],
+
+    "@kiaa/dotimation-core": ["@kiaa/dotimation-core@workspace:packages/core"],
+
+    "@kiaa/dotimation-react": ["@kiaa/dotimation-react@workspace:packages/react"],
+
+    "@kiaa/dotimation-svelte": ["@kiaa/dotimation-svelte@workspace:packages/svelte"],
 
     "@napi-rs/wasm-runtime": ["@napi-rs/wasm-runtime@1.1.6", "", { "dependencies": { "@tybys/wasm-util": "^0.10.3" }, "peerDependencies": { "@emnapi/core": "^1.7.1", "@emnapi/runtime": "^1.7.1" } }, "sha512-ZLv/JdUfkvOy9eCnnBaGfiO+XimbjebAeO+MRQqD/B+FR1tnRN0tpKSJHRbE8sFfS6aqsXZ67TQjfwfsxULVbg=="],
 
@@ -478,8 +480,6 @@
     "detect-libc": ["detect-libc@2.1.2", "", {}, "sha512-Btj2BOOO83o3WyH59e8MgXsxEQVcarkUOpEYrubB0urwnN10yQ364rsiByU11nZlqWYZm05i/of7io4mzihBtQ=="],
 
     "devalue": ["devalue@5.9.4", "", {}, "sha512-sPAT4pztbu6586/hrhOnMKS17IJrvg12mXiSPSS3W5qDeN2RGgvZ0diZCm31dBbnevfVmujNO3IM2wrS4Y2Rhg=="],
-
-    "dotimation": ["dotimation@workspace:packages/react"],
 
     "dotimation-playground-react": ["dotimation-playground-react@workspace:apps/playground-react"],
 

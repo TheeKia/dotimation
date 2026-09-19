@@ -6,9 +6,9 @@ Repository guidance for coding agents and contributors working in this project.
 
 `dotimation` renders text and images as animated dots on a canvas. This Bun workspace has three ESM-only packages:
 
-- `packages/core` → `@dotimation/core`: framework-independent simulation, rasterization, backends, and browser runtime.
-- `packages/react` → `dotimation`: React 19 adapter. Existing imports and previously exported types remain compatible.
-- `packages/svelte` → `@dotimation/svelte`: Svelte 5 adapter (minimum 5.29 for attachments).
+- `packages/core` → `@kiaa/dotimation-core`: framework-independent simulation, rasterization, backends, and browser runtime.
+- `packages/react` → `@kiaa/dotimation-react`: React 19 adapter. Previously exported types remain compatible; the former `dotimation` package is replaced by this scoped package.
+- `packages/svelte` → `@kiaa/dotimation-svelte`: Svelte 5 adapter (minimum 5.29 for attachments).
 - `apps/playground-react` and `apps/playground-svelte`: source-linked Vite development apps.
 - `test/e2e`: Chromium scenarios shared across adapters; `test/fixtures/browser`: common lifecycle driver and real GPU checks.
 - `test/fixtures/consumers`: isolated package consumers used to verify the actual tarballs, without source aliases.

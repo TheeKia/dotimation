@@ -15,7 +15,7 @@ for (const name of ['core', 'react', 'svelte']) {
     fail(`${name}: package versions must stay synchronized`)
   if (
     name !== 'core' &&
-    manifest.dependencies?.['@dotimation/core'] !== 'workspace:*'
+    manifest.dependencies?.['@kiaa/dotimation-core'] !== 'workspace:*'
   )
     fail(`${name}: core must be a workspace dependency`)
   const entry = manifest.exports['.']

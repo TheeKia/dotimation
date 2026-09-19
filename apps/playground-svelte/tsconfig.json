@@ -4,8 +4,8 @@
     "isolatedDeclarations": false,
     "types": ["vite/client", "@webgpu/types"],
     "paths": {
-      "@dotimation/core": ["../../packages/core/src/index.ts"],
-      "@dotimation/svelte": ["../../packages/svelte/src/lib/index.ts"]
+      "@kiaa/dotimation-core": ["../../packages/core/src/index.ts"],
+      "@kiaa/dotimation-svelte": ["../../packages/svelte/src/lib/index.ts"]
     }
   },
   "include": ["src/**/*.ts", "src/**/*.svelte"]

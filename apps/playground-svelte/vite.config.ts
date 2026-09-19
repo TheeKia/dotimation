@@ -6,10 +6,10 @@ export default defineConfig({
   plugins: [svelte()],
   resolve: {
     alias: {
-      '@dotimation/core': fileURLToPath(
+      '@kiaa/dotimation-core': fileURLToPath(
         new URL('../../packages/core/src/index.ts', import.meta.url),
       ),
-      '@dotimation/svelte': fileURLToPath(
+      '@kiaa/dotimation-svelte': fileURLToPath(
         new URL('../../packages/svelte/src/lib/index.ts', import.meta.url),
       ),
     },

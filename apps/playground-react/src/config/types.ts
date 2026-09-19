@@ -1,4 +1,4 @@
-import type { BackendKind } from 'dotimation'
+import type { BackendKind } from '@kiaa/dotimation-react'
 
 export type TextItemConfig = {
   type: 'text'

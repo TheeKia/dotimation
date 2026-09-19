@@ -1,13 +1,13 @@
-# dotimation
+# @kiaa/dotimation-react
 
 Animate text and images with dots in React 19.
 
 ```sh
-bun add dotimation
+bun add @kiaa/dotimation-react
 ```
 
 ```tsx
-import { Dotimation } from 'dotimation'
+import { Dotimation } from '@kiaa/dotimation-react'
 
 <Dotimation
   item={{ type: 'text', data: 'Hello' }}
@@ -19,8 +19,8 @@ import { Dotimation } from 'dotimation'
 
 Use `fill` instead of width/height inside a container with a defined height. `ref` exposes the current canvas; `className` and `style` control presentation. CSS width and height are controlled by the sizing props. Server rendering reserves space; animation starts after mounting.
 
-Canvas2D, WebGL2 and WebGPU backends share the same behavior through `@dotimation/core`, installed automatically. The component honors reduced motion, loads custom fonts, and updates live without restarting for ordinary content/motion changes.
+Canvas2D, WebGL2 and WebGPU backends share the same behavior through `@kiaa/dotimation-core`, installed automatically. The component honors reduced motion, loads custom fonts, and updates live without restarting for ordinary content/motion changes.
 
-See the [full API documentation](https://github.com/TheeKia/dotimation#shared-api). For Svelte, use [`@dotimation/svelte`](https://github.com/TheeKia/dotimation#svelte-usage).
+See the [full API documentation](https://github.com/TheeKia/dotimation#shared-api). For Svelte, use [`@kiaa/dotimation-svelte`](https://github.com/TheeKia/dotimation#svelte-usage).
 
 MIT

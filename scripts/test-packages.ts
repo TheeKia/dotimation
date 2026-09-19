@@ -53,9 +53,10 @@ try {
       recursive: true,
     })
     const dependencies: Record<string, string> = {
-      '@dotimation/core': `file:${archives.get('core')}`,
-      [framework === 'react' ? 'dotimation' : '@dotimation/svelte']:
-        `file:${archives.get(framework)}`,
+      '@kiaa/dotimation-core': `file:${archives.get('core')}`,
+      [framework === 'react'
+        ? '@kiaa/dotimation-react'
+        : '@kiaa/dotimation-svelte']: `file:${archives.get(framework)}`,
     }
     const tooling =
       framework === 'react'
@@ -72,7 +73,9 @@ try {
           type: 'module',
           dependencies,
           // Resolve the unpublished core dependency to its real tarball.
-          overrides: { '@dotimation/core': dependencies['@dotimation/core'] },
+          overrides: {
+            '@kiaa/dotimation-core': dependencies['@kiaa/dotimation-core'],
+          },
         },
         null,
         2,
@@ -80,15 +83,18 @@ try {
     )
     await run(['bun', 'install', '--ignore-scripts'], cwd)
     const adapterName =
-      framework === 'react' ? 'dotimation' : '@dotimation/svelte'
+      framework === 'react'
+        ? '@kiaa/dotimation-react'
+        : '@kiaa/dotimation-svelte'
     const adapterManifest = await Bun.file(
       join(cwd, 'node_modules', adapterName, 'package.json'),
     ).json()
     const coreManifest = await Bun.file(
-      join(cwd, 'node_modules/@dotimation/core/package.json'),
+      join(cwd, 'node_modules/@kiaa/dotimation-core/package.json'),
     ).json()
     if (
-      adapterManifest.dependencies['@dotimation/core'] !== coreManifest.version
+      adapterManifest.dependencies['@kiaa/dotimation-core'] !==
+      coreManifest.version
     )
       throw new Error(
         'Packed core dependency does not match the release version',
