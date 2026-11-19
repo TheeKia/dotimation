@@ -54,11 +54,10 @@ for (const name of ['core', 'react', 'svelte']) {
       fail(`${name}/${file}: browser output imports a runtime builtin`)
     if (/["'](?:@\/|\.\.\/.*packages\/|.*workspace:)/.test(content))
       fail(`${name}/${file}: unresolved source/workspace reference`)
-    // Consumer bundlers may rewrite import.meta.url (Turbopack emits
-    // file:///ROOT/...), so URLs derived from it break in production.
-    // Bun's modulePreload helper is the usual source; see bunup.config.ts.
     if (/modulepreload|import\.meta\.url/i.test(content))
-      fail(`${name}/${file}: output preloads chunks or uses import.meta.url`)
+      fail(
+        `${name}/${file}: import.meta.url breaks under consumer bundlers (see core/bunup.config.ts)`,
+      )
     if (
       name === 'core' &&
       /(?:from|import\()[\s]*["'](?:react|react-dom|svelte)(?:[/'"])/.test(
