@@ -31,6 +31,11 @@ for (const name of ['core', 'react', 'svelte']) {
   const source = await Bun.file(`${root}/dist/index.js`).text()
   if (name === 'core' && source.length < 1000)
     fail('core bundle is gutted (check tree-shaking configuration)')
+  if (
+    name === 'core' &&
+    (source.match(/import\(["']\.\/shared\/[\w-]+\.js["']\)/g) ?? []).length < 2
+  )
+    fail('core: WebGPU/WebGL2 backends must stay lazily imported chunks')
   if (name !== 'svelte' && !source.includes('// built with love'))
     fail(`${name}: missing browser build footer`)
   if (name === 'react' && !/^['"]use client['"]/.test(source))
@@ -49,6 +54,11 @@ for (const name of ['core', 'react', 'svelte']) {
       fail(`${name}/${file}: browser output imports a runtime builtin`)
     if (/["'](?:@\/|\.\.\/.*packages\/|.*workspace:)/.test(content))
       fail(`${name}/${file}: unresolved source/workspace reference`)
+    // Consumer bundlers may rewrite import.meta.url (Turbopack emits
+    // file:///ROOT/...), so URLs derived from it break in production.
+    // Bun's modulePreload helper is the usual source; see bunup.config.ts.
+    if (/modulepreload|import\.meta\.url/i.test(content))
+      fail(`${name}/${file}: output preloads chunks or uses import.meta.url`)
     if (
       name === 'core' &&
       /(?:from|import\()[\s]*["'](?:react|react-dom|svelte)(?:[/'"])/.test(
