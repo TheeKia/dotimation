@@ -351,6 +351,29 @@ async function runLifecycle(page: Page, errors: string[]): Promise<void> {
     (await page.evaluate(() => window.lifecycle.verifyRestore())) > 0,
   )
 
+  // Without WebGPU, auto must skip WebGL2 only when it renders in software.
+  // Metal is the only hardware path here; Linux Vulkan uses SwiftShader.
+  const autoTier =
+    process.env.DOTIMATION_E2E_ANGLE === 'metal' ? 'webgl2' : 'canvas2d'
+  const updates = await page.evaluate(() => {
+    const before = window.lifecycle.updates
+    Reflect.deleteProperty(Navigator.prototype, 'gpu')
+    window.lifecycle.render({ backend: 'auto' })
+    return before
+  })
+  await page.waitForFunction(
+    (before) =>
+      window.lifecycle.updates > before &&
+      (window.lifecycle.stats?.particles ?? 0) > 0,
+    updates,
+  )
+  const resolved = await page.evaluate(() => window.lifecycle.stats?.backend)
+  check(
+    `auto without WebGPU resolves ${autoTier} on this renderer`,
+    resolved === autoTier,
+    resolved,
+  )
+
   // Force an init failure AFTER WebGL has bound the canvas to its context.
   await page.evaluate(() => {
     WebGL2RenderingContext.prototype.createShader = () => null

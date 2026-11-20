@@ -83,7 +83,7 @@ The common interface is `init / uploadField / setParams / step / draw / resize /
 
 `backends/gpu-shared.ts` owns shared buffer layout, QUAD, packers, scratch growth and fader thresholds. Fader expiry integrates `dt * opacityRate` across actual rate changes; never recalculate earlier loss using a new rate.
 
-`engine/select.ts` performs an async cascade, auto starting with the supported subset of WebGPU → WebGL2 → Canvas2D. GPU modules load dynamically. A failed GPU init throws `BackendRetryError`; acquiring a context permanently binds a canvas to that type, so fallback requires a fresh canvas. Cancellation must prevent late canvas binding, leaked devices and unintended fallback.
+`engine/select.ts` performs an async cascade, auto starting with the supported subset of WebGPU → WebGL2 → Canvas2D. In auto only, `engine/backend.ts` treats software-rendered WebGL2 (SwiftShader, llvmpipe, WARP) as unsupported: its per-instance draw cost blocks the main thread far longer than Canvas2D. GPU modules load dynamically. A failed GPU init throws `BackendRetryError`; acquiring a context permanently binds a canvas to that type, so fallback requires a fresh canvas. Cancellation must prevent late canvas binding, leaked devices and unintended fallback.
 
 GPU recovery snaps the last uploaded CPU field and repaints immediately with a full upload. CPU alpha and positions are stale under GPU simulation; uploading them unchanged can leave a sleeping engine blank. Dispose partially created resources after failures.
 

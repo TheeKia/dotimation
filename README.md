@@ -145,7 +145,7 @@ There is no `idle` prop — the rAF loop's lifetime is derived from `motion.jitt
 
 ### Rendering backends
 
-`backend="auto"` picks the best available tier — WebGPU (compute shader), then WebGL2 (transform feedback), then Canvas2D (always available). An explicit request pins the *starting* tier and keeps everything below it as fallback, so `backend="webgpu"` on a machine without WebGPU still gets WebGL2. All tiers render identically (same blending, device-pixel snapping, and dot sizing); `onStats` tells you which one is active.
+`backend="auto"` picks the best available tier — WebGPU (compute shader), then WebGL2 (transform feedback), then Canvas2D (always available). WebGL2 is skipped when the browser renders it in software (SwiftShader, llvmpipe, WARP), as in headless audits such as Lighthouse, because Canvas2D is much cheaper there. An explicit request pins the *starting* tier and keeps everything below it as fallback, so `backend="webgpu"` on a machine without WebGPU still gets WebGL2. All tiers render identically (same blending, device-pixel snapping, and dot sizing); `onStats` tells you which one is active.
 
 ### Accessibility
 
